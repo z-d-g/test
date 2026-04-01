@@ -26,7 +26,8 @@ Or build from source:
 ```bash
 git clone https://github.com/z-d-g/md-cli.git
 cd md-cli
-go build -o md-cli ./cmd/md-cli
+make build    # → bin/md-cli
+make install  # → ~/.local/bin/md-cli
 ```
 
 ## Usage
@@ -47,6 +48,20 @@ cat file.md | md-cli -p     # pipe from stdin
 
 
 Full reference: press `F1` in the editor.
+
+## Makefile
+
+```bash
+make              # build (same as make build)
+make release      # build with version stamped into the binary
+make run FILE=x.md  # run from source
+make test         # run tests
+make install      # copy to ~/.local/bin
+make uninstall    # remove it
+make clean        # delete build artifacts
+```
+
+Override defaults: `make install PREFIX=/usr/local` or `make run FILE=notes.md`.
 
 ## License
 
