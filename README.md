@@ -1,12 +1,15 @@
 # md-cli
 
-Terminal markdown editor with live rendering. Written in Go.
+> Terminal markdown editor with live rendering. Written in Go.
+
+![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=flat-square&logo=go&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-blue?style=flat-square)
 
 ## Features
 
 - **Live rendering** — headings, bold, italic, code, links, tables, lists, images
-- **Syntax-aware cursor** — jumps between rendered vs raw source in code blocks, tables, and lists
-- **Full editing** — selection, copy/cut/paste, undo/redo, word/line operations
+- **Syntax-aware cursor** — jumps between rendered and raw source in code blocks, tables, and lists
+- **Full editing** — selection, copy/cut/paste, undo/redo, word and line operations
 - **Persistent cursor** — restores position per file across sessions
 - **Adaptive theming** — respects terminal light/dark background
 - **Print mode** — render markdown to stdout without the editor
@@ -22,34 +25,28 @@ Or build from source:
 ```bash
 git clone https://github.com/z-d-g/md-cli.git
 cd md-cli
-make build-release
+go build -o md-cli ./cmd/md-cli
 ```
 
 ## Usage
 
 ```bash
-md-cli file.md          # open in editor
-md-cli -p file.md       # print to stdout
+md-cli file.md              # open in editor
+md-cli -p file.md           # print to stdout
+cat file.md | md-cli -p     # pipe from stdin
 ```
 
-Keybindings: `F1` for help. `Ctrl+Q` quit. `Ctrl+S` save.
+### Keybindings
 
-## Release
+| Key     | Action |
+|---------|--------|
+| Ctrl+S  | Save   |
+| Ctrl+Q  | Quit   |
+| F1      | Help   |
 
-Push a tag → GitHub Actions builds binaries for Linux, macOS, and Windows (amd64 + arm64) → uploads to [Releases](../../releases).
 
-```bash
-git tag v0.1.0
-git push origin v0.1.0
-# then create a release from the tag on GitHub
-```
-
-## Built With
-
-- [Bubble Tea](https://github.com/charmbracelet/bubbletea) — TUI framework
-- [Lipgloss](https://github.com/charmbracelet/lipgloss) — styling
-- [clipboard](https://golang.design/x/clipboard) — system clipboard
+Full reference: press `F1` in the editor.
 
 ## License
 
-MIT
+[MIT](LICENSE)
