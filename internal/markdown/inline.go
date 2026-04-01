@@ -28,16 +28,17 @@ func ParseInlineElements(line string) []InlineElement {
 			}
 		}
 
-		// Bold: **text**
-		if i+2 <= len(line) && line[i:i+2] == "**" {
-			end := FindClosingDelimiter(line, i+2, "**")
+		// Bold: **text** or __text__
+		if i+2 <= len(line) && (line[i:i+2] == "**" || line[i:i+2] == "__") {
+			delim := line[i : i+2]
+			end := FindClosingDelimiter(line, i+2, delim)
 			if end != -1 {
 				content := line[i+2 : end]
 				nestedElements := ParseInlineElements(content)
 				elements = append(elements, InlineElement{
 					Type:      InlineBold,
 					Content:   content,
-					Delimiter: "**",
+					Delimiter: delim,
 					Children:  nestedElements,
 				})
 				i = end + 2
@@ -45,16 +46,16 @@ func ParseInlineElements(line string) []InlineElement {
 			}
 		}
 
-		// Underline: __text__
-		if i+2 <= len(line) && line[i:i+2] == "__" {
-			end := FindClosingDelimiter(line, i+2, "__")
+		// Underline: ++text++
+		if i+2 <= len(line) && line[i:i+2] == "++" {
+			end := FindClosingDelimiter(line, i+2, "++")
 			if end != -1 {
 				content := line[i+2 : end]
 				nestedElements := ParseInlineElements(content)
 				elements = append(elements, InlineElement{
 					Type:      InlineUnderline,
 					Content:   content,
-					Delimiter: "__",
+					Delimiter: "++",
 					Children:  nestedElements,
 				})
 				i = end + 2
@@ -280,7 +281,7 @@ func collectSpans(elems []InlineElement, line string, offset *int, spans *[]Synt
 		switch elem.Type {
 		case InlineText:
 			*offset += len(elem.Content)
-		case InlineBold, InlineBoldItalic:
+		case InlineBold:
 			dLen := len(elem.Delimiter)
 			*spans = append(*spans,
 				SyntaxSpan{Start: *offset, End: *offset + dLen, SpanType: SpanBold},
@@ -289,6 +290,17 @@ func collectSpans(elems []InlineElement, line string, offset *int, spans *[]Synt
 			collectSpans(elem.Children, line, offset, spans)
 			*spans = append(*spans,
 				SyntaxSpan{Start: *offset, End: *offset + dLen, SpanType: SpanBold},
+			)
+			*offset += dLen
+		case InlineBoldItalic:
+			dLen := len(elem.Delimiter)
+			*spans = append(*spans,
+				SyntaxSpan{Start: *offset, End: *offset + dLen, SpanType: SpanBoldItalic},
+			)
+			*offset += dLen
+			collectSpans(elem.Children, line, offset, spans)
+			*spans = append(*spans,
+				SyntaxSpan{Start: *offset, End: *offset + dLen, SpanType: SpanBoldItalic},
 			)
 			*offset += dLen
 		case InlineItalic:
@@ -305,12 +317,12 @@ func collectSpans(elems []InlineElement, line string, offset *int, spans *[]Synt
 		case InlineUnderline:
 			dLen := len(elem.Delimiter)
 			*spans = append(*spans,
-				SyntaxSpan{Start: *offset, End: *offset + dLen, SpanType: SpanBold},
+				SyntaxSpan{Start: *offset, End: *offset + dLen, SpanType: SpanUnderline},
 			)
 			*offset += dLen
 			collectSpans(elem.Children, line, offset, spans)
 			*spans = append(*spans,
-				SyntaxSpan{Start: *offset, End: *offset + dLen, SpanType: SpanBold},
+				SyntaxSpan{Start: *offset, End: *offset + dLen, SpanType: SpanUnderline},
 			)
 			*offset += dLen
 		case InlineCode:

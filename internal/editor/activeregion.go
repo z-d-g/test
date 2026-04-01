@@ -15,6 +15,8 @@ type SyntaxSpan = markdown.SyntaxSpan
 const (
 	SpanBold             = markdown.SpanBold
 	SpanItalic           = markdown.SpanItalic
+	SpanBoldItalic       = markdown.SpanBoldItalic
+	SpanUnderline        = markdown.SpanUnderline
 	SpanCode             = markdown.SpanCode
 	SpanLink             = markdown.SpanLink
 	SpanImage            = markdown.SpanImage
@@ -107,9 +109,17 @@ func isInCodeBlock(buf *GapBuffer, row int) bool {
 	trimmed := strings.TrimSpace(buf.LineAt(row))
 
 	insideCodeBlock := false
+	fenceChar := byte(0)
 	for i := 0; i <= row && i < buf.LineCount(); i++ {
 		if markdown.IsCodeFence(buf.LineAt(i)) {
-			insideCodeBlock = !insideCodeBlock
+			fc := markdown.CodeFenceChar(buf.LineAt(i))
+			if insideCodeBlock && fc == fenceChar {
+				insideCodeBlock = false
+				fenceChar = 0
+			} else if !insideCodeBlock {
+				insideCodeBlock = true
+				fenceChar = fc
+			}
 		}
 	}
 	return insideCodeBlock || markdown.IsCodeFence(trimmed)
@@ -203,6 +213,7 @@ func hasInlineSyntax(line string) bool {
 	spans := FindSyntaxSpans(line)
 	for _, span := range spans {
 		if span.SpanType == SpanBold || span.SpanType == SpanItalic ||
+			span.SpanType == SpanBoldItalic || span.SpanType == SpanUnderline ||
 			span.SpanType == SpanCode || span.SpanType == SpanLink ||
 			span.SpanType == SpanImage || span.SpanType == SpanStrikethrough {
 			return true

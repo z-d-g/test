@@ -27,6 +27,8 @@ type SpanType int
 const (
 	SpanBold SpanType = iota
 	SpanItalic
+	SpanBoldItalic
+	SpanUnderline
 	SpanCode
 	SpanLink
 	SpanImage

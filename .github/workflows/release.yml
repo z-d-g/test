@@ -21,6 +21,7 @@ jobs:
       - name: Build
         shell: bash
         run: |
+          mkdir -p dist
           for os in linux darwin windows; do
             for arch in amd64 arm64; do
               ext=""
@@ -29,6 +30,7 @@ jobs:
                 -o "dist/md-cli-${os}-${arch}${ext}" ./cmd/md-cli/
             done
           done
+          cd dist && sha256sum * > checksums.txt
 
       - name: Upload
         if: github.event_name == 'release'

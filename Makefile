@@ -46,42 +46,6 @@ build:
 release:
 	$(CGO) go build $(GOFLAGS) -ldflags="$(EXTLDFLAGS)" -o bin/$(BINARY) $(MODULE)
 
-# ── Cross-compile all platforms ────────────────────────────────────
-PLATFORMS := linux/amd64 linux/arm64 darwin/amd64 darwin/arm64 windows/amd64 windows/arm64
-
-.PHONY: build-all
-build-all:
-	@for platform in $(PLATFORMS); do \
-		os=$${platform%/*}; \
-		arch=$${platform#*/}; \
-		ext=""; \
-		[ "$$os" = "windows" ] && ext=".exe"; \
-		output="dist/$(BINARY)-$$os-$$arch$$ext"; \
-		echo "  $$output"; \
-		GOOS=$$os GOARCH=$$arch $(CGO) go build $(GOFLAGS) \
-			-ldflags="$(EXTLDFLAGS)" \
-			-o "$$output" $(MODULE) || exit 1; \
-	done
-	@echo "✓ All binaries in dist/"
-
-# ── Create release tarballs/zip ────────────────────────────────────
-.PHONY: dist
-dist: build-all
-	@mkdir -p dist
-	@for platform in $(PLATFORMS); do \
-		os=$${platform%/*}; \
-		arch=$${platform#*/}; \
-		ext=""; \
-		[ "$$os" = "windows" ] && ext=".exe"; \
-		src="dist/$(BINARY)-$$os-$$arch$$ext"; \
-		if [ "$$os" = "windows" ]; then \
-			(cd dist && zip -q "$(BINARY)-$$os-$$arch.zip" "$$(basename $$src)"); \
-		else \
-			tar -czf "dist/$(BINARY)-$$os-$$arch.tar.gz" -C dist "$$(basename $$src)"; \
-		fi; \
-	done
-	@echo "✓ Archives in dist/"
-
 # ── Install (platform-aware) ──────────────────────────────────────
 .PHONY: install
 install: release
@@ -105,12 +69,6 @@ endif
 uninstall:
 	rm -f $(DESTDIR)$(BINDIR)/$(BINARY)
 	@echo "✓ Removed $(DESTDIR)$(BINDIR)/$(BINARY)"
-
-# ── System-wide install (needs sudo/root) ──────────────────────────
-.PHONY: install-system
-install-system: release
-	install -Dm755 bin/$(BINARY) $(DESTDIR)/usr/local/bin/$(BINARY)
-	@echo "✓ Installed to $(DESTDIR)/usr/local/bin/$(BINARY)"
 
 # ── Development ────────────────────────────────────────────────────
 .PHONY: run
@@ -139,7 +97,7 @@ fmt:
 # ── Cleanup ────────────────────────────────────────────────────────
 .PHONY: clean
 clean:
-	rm -rf bin/ dist/ coverage.out coverage.html
+	rm -rf bin/ coverage.out coverage.html
 	@echo "✓ Clean"
 
 # ── Help ───────────────────────────────────────────────────────────
@@ -150,12 +108,9 @@ help:
 	@printf 'Build:\n'
 	@printf '  build          Build for current platform\n'
 	@printf '  release        Build with version info\n'
-	@printf '  build-all      Cross-compile linux/darwin/windows (amd64+arm64)\n'
-	@printf '  dist           build-all + tarballs/zips\n'
 	@printf '\n'
 	@printf 'Install (PREFIX=%s):\n' "$(PREFIX)"
 	@printf '  install        Install to $$PREFIX/bin (default: ~/.local/bin)\n'
-	@printf '  install-system Install to /usr/local/bin\n'
 	@printf '  uninstall      Remove from $$PREFIX/bin\n'
 	@printf '\n'
 	@printf 'Dev:\n'

@@ -72,7 +72,7 @@ func (renderer *lipglossRenderer) RenderSourceInline(elements []InlineElement, b
 				result.WriteString(elem.Content)
 			}
 		case InlineBold:
-			delim := base("**")
+			delim := base(elem.Delimiter)
 			result.WriteString(delim)
 			boldBase := base.Compose(renderer.styleCache.boldFunc)
 			content := renderer.RenderSourceInline(elem.Children, boldBase)
@@ -93,7 +93,7 @@ func (renderer *lipglossRenderer) RenderSourceInline(elements []InlineElement, b
 			result.WriteString(content)
 			result.WriteString(delim)
 		case InlineUnderline:
-			delim := base("__")
+			delim := base(elem.Delimiter)
 			result.WriteString(delim)
 			underlineBase := base.Compose(renderer.styleCache.underlineFunc)
 			content := renderer.RenderSourceInline(elem.Children, underlineBase)

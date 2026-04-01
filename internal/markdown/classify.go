@@ -8,6 +8,21 @@ func IsCodeFence(line string) bool {
 	return strings.HasPrefix(trimmed, "```") || strings.HasPrefix(trimmed, "~~~")
 }
 
+// CodeFenceChar returns the fence character (` or ~) of a code fence line,
+// or 0 if the line is not a fence.
+func CodeFenceChar(line string) byte {
+	trimmed := strings.TrimSpace(line)
+	if len(trimmed) < 3 {
+		return 0
+	}
+	switch trimmed[0] {
+	case '`', '~':
+		return trimmed[0]
+	default:
+		return 0
+	}
+}
+
 // IsHorizontalRule reports whether line is a horizontal rule.
 func IsHorizontalRule(line string) bool {
 	trimmed := strings.TrimSpace(line)
@@ -59,8 +74,28 @@ func IsBlockquoteLine(line string) bool {
 }
 
 // IsTableLine reports whether line is part of a table.
+// Requires pipes with surrounding whitespace or at line boundaries,
+// and at least 2 pipe-delimited fields.
 func IsTableLine(line string) bool {
-	return strings.Contains(line, "|") && strings.Count(line, "|") >= 2
+	if strings.Count(line, "|") < 2 {
+		return false
+	}
+	// Lines starting/ending with | are likely tables
+	trimmed := strings.TrimSpace(line)
+	if strings.HasPrefix(trimmed, "|") || strings.HasSuffix(trimmed, "|") {
+		return true
+	}
+	// For mid-line pipes, require whitespace around at least one pipe
+	// to avoid matching shell pipelines like `foo | bar | baz`
+	for i := 0; i < len(line)-1; i++ {
+		if line[i] == '|' && i > 0 && i < len(line)-1 {
+			if (line[i-1] == ' ' || line[i-1] == '\t') &&
+				(line[i+1] == ' ' || line[i+1] == '\t' || line[i+1] == '-') {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // IsTableSeparatorLine reports whether line is a table separator (e.g., |---|---|).

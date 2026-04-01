@@ -107,12 +107,22 @@ func (e *Editor) computeFrameState() {
 	}
 
 	inside := false
+	fenceChar := byte(0)
 	for i := range lineCount {
 		line := e.buf.LineAt(i)
 		trimmed := strings.TrimSpace(line)
 		if markdown.IsCodeFence(trimmed) {
 			e.frame.codeBlockLines[i] = false
-			inside = !inside
+			if inside {
+				// Only close if fence char matches the opening
+				if markdown.CodeFenceChar(trimmed) == fenceChar {
+					inside = false
+					fenceChar = 0
+				}
+			} else {
+				inside = true
+				fenceChar = markdown.CodeFenceChar(trimmed)
+			}
 		} else {
 			e.frame.codeBlockLines[i] = inside
 		}

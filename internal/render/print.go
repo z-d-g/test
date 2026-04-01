@@ -31,10 +31,18 @@ func (p *PrintRenderer) RenderDocument(content string) string {
 	b.Grow(len(content) * 2)
 
 	inCodeBlock := false
+	fenceChar := byte(0)
 	for i, line := range lines {
 		b.WriteString(p.renderer.RenderLine(line, inCodeBlock))
 		if markdown.IsCodeFence(line) {
-			inCodeBlock = !inCodeBlock
+			fc := markdown.CodeFenceChar(line)
+			if inCodeBlock && fc == fenceChar {
+				inCodeBlock = false
+				fenceChar = 0
+			} else if !inCodeBlock {
+				inCodeBlock = true
+				fenceChar = fc
+			}
 		}
 		if i < len(lines)-1 {
 			b.WriteByte('\n')
