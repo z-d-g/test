@@ -6,7 +6,7 @@ import (
 
 	"github.com/z-d-g/md-cli/internal/constants"
 
-	"golang.design/x/clipboard"
+	nativeclipboard "github.com/aymanbagabas/go-nativeclipboard"
 
 	tea "charm.land/bubbletea/v2"
 )
@@ -572,7 +572,7 @@ func (kb *KeyBindings) handleRedo() tea.Cmd {
 func (kb *KeyBindings) handleCopy() tea.Cmd {
 	// First check if we're inside a code block and copy the entire block
 	if codeBlock := kb.detectCodeBlockAtCursor(); codeBlock != nil {
-		clipboard.Write(clipboard.FmtText, codeBlock)
+		nativeclipboard.Text.Write(codeBlock)
 		return kb.showNotification(constants.CodeBlockCopied)
 	}
 
@@ -580,7 +580,7 @@ func (kb *KeyBindings) handleCopy() tea.Cmd {
 	if kb.editor.selection.IsActive() {
 		selected := kb.editor.selection.GetSelectedText(kb.editor.buf)
 		if selected != nil {
-			clipboard.Write(clipboard.FmtText, selected)
+			nativeclipboard.Text.Write(selected)
 			kb.editor.selection.Clear()
 			return kb.showNotification(constants.TextCopied)
 		}
@@ -608,7 +608,7 @@ func (kb *KeyBindings) handleCut() tea.Cmd {
 			kb.editor.nav.SetCursor(start)
 			kb.editor.selection.Clear()
 
-			clipboard.Write(clipboard.FmtText, selected)
+			nativeclipboard.Text.Write(selected)
 
 			// Invalidate all cache entries since line numbers may have shifted
 			kb.editor.afterMultiLineEdit()
@@ -622,9 +622,8 @@ func (kb *KeyBindings) handlePaste() tea.Cmd {
 	currentCursor := kb.editor.nav.Cursor()
 
 	// Get from clipboard
-	pasteContent := clipboard.Read(clipboard.FmtText)
-	// If clipboard returns nil, use empty string
-	if pasteContent == nil {
+	pasteContent, err := nativeclipboard.Text.Read()
+	if err != nil || pasteContent == nil {
 		pasteContent = []byte("")
 	}
 

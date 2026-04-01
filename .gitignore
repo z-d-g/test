@@ -1,1 +1,7 @@
-Makefile
+dist/
+bin/
+coverage.*
+
+
+**/*.md
+!README.md

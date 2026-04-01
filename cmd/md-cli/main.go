@@ -10,13 +10,9 @@ import (
 	"github.com/z-d-g/md-cli/internal/config"
 
 	tea "charm.land/bubbletea/v2"
-	"golang.design/x/clipboard"
 )
 
 func main() {
-	if err := clipboard.Init(); err != nil {
-		slog.Error("clipboard init", "err", err)
-	}
 
 	cfg := config.LoadConfig()
 	cliArgs := app.ParseCLIArgs(os.Args[1:])
