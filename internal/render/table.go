@@ -89,6 +89,7 @@ func (r *lipglossRenderer) computeTableWidths(currentLine string) {
 
 // ResetTable clears table state between separate tables.
 func (r *lipglossRenderer) ResetTable() {
+	r.tableVersion++
 	r.table.active = false
 	r.table.alignments = nil
 	r.table.widths = nil

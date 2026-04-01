@@ -180,11 +180,11 @@ func TestGroupUndoEntries(t *testing.T) {
 	um.Record(UndoEntry{offset: 2, inserted: []byte("c"), cursorBefore: 2, cursorAfter: 3})
 
 	grouped := um.GroupUndoEntries(0)
-	if grouped != 1 {
-		t.Errorf("grouped = %d, want 1", grouped)
+	if grouped != 2 {
+		t.Errorf("grouped = %d, want 2", grouped)
 	}
-	if um.Len() != 2 {
-		t.Errorf("Len after grouping = %d, want 2", um.Len())
+	if um.Len() != 1 {
+		t.Errorf("Len after grouping = %d, want 1", um.Len())
 	}
 }
 

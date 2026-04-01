@@ -168,7 +168,7 @@ func TestFindBlockRegion(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				gotStart, gotEnd, gotActive := FindBlockRegion(buf, tt.cursorRow)
+				gotStart, gotEnd, gotActive := FindBlockRegion(buf, tt.cursorRow, nil)
 				if gotStart != tt.wantStart || gotEnd != tt.wantEnd || gotActive != tt.wantActive {
 					t.Errorf("FindBlockRegion() = (%d, %d, %v), want (%d, %d, %v)",
 						gotStart, gotEnd, gotActive, tt.wantStart, tt.wantEnd, tt.wantActive)
@@ -234,7 +234,7 @@ func TestFindBlockRegion(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				gotStart, gotEnd, gotActive := FindBlockRegion(buf, tt.cursorRow)
+				gotStart, gotEnd, gotActive := FindBlockRegion(buf, tt.cursorRow, nil)
 				if gotStart != tt.wantStart || gotEnd != tt.wantEnd || gotActive != tt.wantActive {
 					t.Errorf("FindBlockRegion() = (%d, %d, %v), want (%d, %d, %v)",
 						gotStart, gotEnd, gotActive, tt.wantStart, tt.wantEnd, tt.wantActive)
@@ -286,7 +286,7 @@ func TestFindBlockRegion(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				gotStart, gotEnd, gotActive := FindBlockRegion(buf, tt.cursorRow)
+				gotStart, gotEnd, gotActive := FindBlockRegion(buf, tt.cursorRow, nil)
 				if gotStart != tt.wantStart || gotEnd != tt.wantEnd || gotActive != tt.wantActive {
 					t.Errorf("FindBlockRegion() = (%d, %d, %v), want (%d, %d, %v)",
 						gotStart, gotEnd, gotActive, tt.wantStart, tt.wantEnd, tt.wantActive)
@@ -331,7 +331,7 @@ func TestFindBlockRegion(t *testing.T) {
 
 		for _, tt := range tests {
 			t.Run(tt.name, func(t *testing.T) {
-				gotStart, gotEnd, gotActive := FindBlockRegion(buf, tt.cursorRow)
+				gotStart, gotEnd, gotActive := FindBlockRegion(buf, tt.cursorRow, nil)
 				if gotStart != tt.wantStart || gotEnd != tt.wantEnd || gotActive != tt.wantActive {
 					t.Errorf("FindBlockRegion() = (%d, %d, %v), want (%d, %d, %v)",
 						gotStart, gotEnd, gotActive, tt.wantStart, tt.wantEnd, tt.wantActive)

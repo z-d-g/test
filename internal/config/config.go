@@ -90,7 +90,3 @@ func buildConfig(theme *Theme) *Config {
 func LoadConfig() *Config {
 	return buildConfig(DefaultTheme())
 }
-
-func LoadConfigAdaptive(_ bool) *Config {
-	return buildConfig(DefaultTheme())
-}

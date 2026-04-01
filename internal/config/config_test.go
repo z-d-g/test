@@ -62,14 +62,6 @@ func TestLoadConfig(t *testing.T) {
 	}
 }
 
-func TestLoadConfigAdaptive(t *testing.T) {
-	dark := LoadConfigAdaptive(true)
-	light := LoadConfigAdaptive(false)
-	if dark == nil || light == nil {
-		t.Fatal("LoadConfigAdaptive() returned nil")
-	}
-}
-
 func TestConfigStylesNotEmpty(t *testing.T) {
 	cfg := LoadConfig()
 

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"github.com/z-d-g/md-cli/internal/constants"
 	"github.com/z-d-g/md-cli/internal/markdown"
 	"github.com/z-d-g/md-cli/internal/render"
 
@@ -147,11 +148,11 @@ func (e *Editor) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.MouseWheelMsg:
 		if msg.Button == tea.MouseWheelUp {
-			for range 3 {
+			for range constants.MouseScrollLines {
 				e.keyBindings.handleUp(false)
 			}
 		} else if msg.Button == tea.MouseWheelDown {
-			for range 3 {
+			for range constants.MouseScrollLines {
 				e.keyBindings.handleDown(false)
 			}
 		}
@@ -301,7 +302,7 @@ func (e *Editor) visibleLines() []string {
 // getActiveRegion determines which lines should be shown as raw markdown source.
 func (e *Editor) getActiveRegion() (int, int, bool) {
 	cursorRow, _ := e.buf.CursorToRowCol(e.nav.Cursor())
-	return FindBlockRegion(e.buf, cursorRow)
+	return FindBlockRegion(e.buf, cursorRow, e.frame.codeBlockLines)
 }
 
 // stylizeSourceLine applies styling to a line showing raw markdown syntax.

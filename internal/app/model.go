@@ -32,7 +32,6 @@ type Model struct {
 	Notification   string
 	Config         *config.Config
 	CursorStore    *cursor.PositionStore
-	bgIsDark       bool
 }
 
 func NewModel(filePath string, cfg *config.Config) Model {
@@ -104,7 +103,7 @@ func (m Model) handleExitConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if err := m.saveFile(); err != nil {
 			m.Notification = "save error"
 		} else {
-			m.Notification = "saved"
+			m.Notification = string(constants.Saved)
 		}
 		return m, m.showTemporaryNotification(m.Notification)
 	}
@@ -190,8 +189,8 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.SavedContent = m.Editor.Value()
 			m.Editor.MarkClean()
 		}
-		m.Notification = ""
-		return m, nil
+		m.Notification = string(constants.Saved)
+		return m, m.showTemporaryNotification(m.Notification)
 	default:
 		return m.updateEditor(msg)
 	}
@@ -202,9 +201,8 @@ func (m Model) handleEditorNotification(msg editor.NotificationMsg) (tea.Model, 
 	return m, m.showTemporaryNotification(m.Notification)
 }
 
-func (m Model) handleBackgroundColor(msg tea.BackgroundColorMsg) (tea.Model, tea.Cmd) {
-	m.bgIsDark = msg.IsDark()
-	m.Config = config.LoadConfigAdaptive(m.bgIsDark)
+func (m Model) handleBackgroundColor(_ tea.BackgroundColorMsg) (tea.Model, tea.Cmd) {
+	m.Config = config.LoadConfig()
 	return m, nil
 }
 
@@ -374,6 +372,8 @@ func (m Model) getNotificationMessage() string {
 		return constants.CutToClipboard.Message()
 	case string(constants.PastedFromClipboard):
 		return constants.PastedFromClipboard.Message()
+	case string(constants.Saved):
+		return constants.Saved.Message()
 	default:
 		return m.Notification
 	}

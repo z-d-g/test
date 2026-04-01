@@ -13,7 +13,7 @@ Go (Bubble Tea v2 + Lipgloss v2) terminal markdown editor with custom in-editor 
 ## Dependencies
 - `charm.land/bubbletea/v2` — TUI framework
 - `charm.land/lipgloss/v2` — Styling (value-based, `color.Color`)
-- `github.com/aymanbagabas/go-nativeclipboard` — System clipboard (CGO)
+- `github.com/aymanbagabas/go-nativeclipboard` — System clipboard (CGO=0)
 
 ## Package Map
 
@@ -42,7 +42,7 @@ internal/
 │   ├── inline.go      RenderInline, RenderSourceInline
 │   ├── table.go       tableContext, renderTable, parseTableCells, alignText
 │   ├── list.go        renderCheckbox, renderNumberedList, renderBulletList
-│   ├── image.go       renderImageAlt (renderImageIcon unused)
+│   ├── image.go       renderImageAlt (renders ⊞ + alt text)
 │   └── print.go       PrintRenderer, RenderDocument
 ├── editor/        Buffer, nav, selection, undo, keys, view
 │   ├── gapbuffer.go   GapBuffer (byte gap buffer + line index + rune methods)
@@ -143,11 +143,3 @@ Cursor position determines which lines show raw markdown source vs rendered outp
 - On heading → heading line is raw
 - On blockquote → blockquote block is raw
 - On line with inline syntax (bold, italic, etc.) → that line is raw
-
-## Known Issues
-
-- Global `tableLines` for table width pre-computation (hidden coupling)
-- `render` re-exports `markdown` types (prefer `markdown.X` direct)
-- `isInCodeBlock` in `activeregion.go` recomputes from scratch (should use `frame.codeBlockLines`)
-- `endTypingGroup` resets counters without merging undo entries
-- `go-nativeclipboard` requires CGO

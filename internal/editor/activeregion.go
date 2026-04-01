@@ -66,15 +66,25 @@ func runeToByteOffset(s string, runeIndex int) int {
 }
 
 // FindBlockRegion determines the active region around the cursor for source-mode rendering.
-// This is editor-specific because it depends on GapBuffer.
-func FindBlockRegion(buf *GapBuffer, cursorRow int) (int, int, bool) {
+// codeBlockLines is the pre-computed frame cache (nil if unavailable).
+func FindBlockRegion(buf *GapBuffer, cursorRow int, codeBlockLines []bool) (int, int, bool) {
 	if cursorRow < 0 || cursorRow >= buf.LineCount() {
 		return cursorRow, cursorRow, false
 	}
 
 	currentLine := buf.LineAt(cursorRow)
 
-	if isInCodeBlock(buf, cursorRow) {
+	// Fast path: use cached code block state when available
+	if codeBlockLines != nil && cursorRow < len(codeBlockLines) {
+		if codeBlockLines[cursorRow] {
+			start, end := findCodeBlockBounds(buf, cursorRow)
+			return start, end, true
+		}
+		if markdown.IsCodeFence(currentLine) {
+			start, end := findCodeBlockBounds(buf, cursorRow)
+			return start, end, true
+		}
+	} else if isInCodeBlock(buf, cursorRow) {
 		start, end := findCodeBlockBounds(buf, cursorRow)
 		return start, end, true
 	}

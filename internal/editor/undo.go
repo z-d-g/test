@@ -142,31 +142,43 @@ func (um *UndoManager) GroupUndoEntries(startIndex int) int {
 		return 0
 	}
 
-	grouped := 0
-	for i := startIndex; i < len(um.undoStack)-1; i++ {
-		current := um.undoStack[i]
-		next := um.undoStack[i+1]
+	originalCount := len(um.undoStack) - startIndex
+	var groups []UndoEntry
 
-		// Check if these are consecutive single-character inserts
-		if len(current.inserted) == 1 && len(next.inserted) == 1 &&
-			next.offset == current.offset+len(current.inserted) &&
-			next.cursorBefore == current.cursorAfter {
-
-			// Merge the operations
-			merged := UndoEntry{
-				offset:       current.offset,
-				inserted:     append(current.inserted, next.inserted...),
-				cursorBefore: current.cursorBefore,
-				cursorAfter:  next.cursorAfter,
-			}
-
-			// Replace current with merged, remove next
-			um.undoStack[i] = merged
-			um.undoStack = append(um.undoStack[:i+1], um.undoStack[i+2:]...)
-			grouped++
-			i-- // Check the same position again
+	for i := startIndex; i < len(um.undoStack); i++ {
+		entry := um.undoStack[i]
+		if len(entry.inserted) != 1 {
+			groups = append(groups, entry)
+			continue
 		}
+
+		merged := UndoEntry{
+			offset:       entry.offset,
+			inserted:     make([]byte, 0, 32),
+			cursorBefore: entry.cursorBefore,
+			cursorAfter:  entry.cursorAfter,
+		}
+		merged.inserted = append(merged.inserted, entry.inserted...)
+
+		for i+1 < len(um.undoStack) {
+			next := um.undoStack[i+1]
+			if len(next.inserted) != 1 {
+				break
+			}
+			if next.offset != merged.offset+len(merged.inserted) {
+				break
+			}
+			if next.cursorBefore != merged.cursorAfter {
+				break
+			}
+			merged.inserted = append(merged.inserted, next.inserted...)
+			merged.cursorAfter = next.cursorAfter
+			i++
+		}
+
+		groups = append(groups, merged)
 	}
 
-	return grouped
+	um.undoStack = append(um.undoStack[:startIndex], groups...)
+	return originalCount - len(groups)
 }
