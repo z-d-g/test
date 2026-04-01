@@ -103,9 +103,9 @@ func (m Model) handleExitConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if err := m.saveFile(); err != nil {
 			m.Notification = "save error"
 		} else {
-			m.Notification = string(constants.Saved)
+			m.Notification = ""
 		}
-		return m, m.showTemporaryNotification(m.Notification)
+		return m, nil
 	}
 	return m, nil
 }
@@ -189,8 +189,7 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 			m.SavedContent = m.Editor.Value()
 			m.Editor.MarkClean()
 		}
-		m.Notification = string(constants.Saved)
-		return m, m.showTemporaryNotification(m.Notification)
+		return m, nil
 	default:
 		return m.updateEditor(msg)
 	}
@@ -372,8 +371,6 @@ func (m Model) getNotificationMessage() string {
 		return constants.CutToClipboard.Message()
 	case string(constants.PastedFromClipboard):
 		return constants.PastedFromClipboard.Message()
-	case string(constants.Saved):
-		return constants.Saved.Message()
 	default:
 		return m.Notification
 	}
@@ -416,9 +413,10 @@ func (m Model) renderHelpDialog() string {
 	}
 
 	// ── Build content lines ──
-	innerPad := 2
+	padL := 2
+	padR := 1
 	borderW := 2 // lipgloss RoundedBorder: 1 left + 1 right
-	contentWidth := m.Width - borderW - innerPad*2
+	contentWidth := m.Width - borderW - padL - padR
 
 	// Find max key width for alignment
 	maxKeyW := 0
@@ -458,7 +456,7 @@ func (m Model) renderHelpDialog() string {
 				headerLine.WriteString(strings.Repeat(" ", headerPad))
 			}
 		}
-		contentLines = append(contentLines, strings.Repeat(" ", innerPad)+headerLine.String())
+		contentLines = append(contentLines, strings.Repeat(" ", padL)+headerLine.String()+strings.Repeat(" ", padR))
 
 		// Items interleaved
 		maxItems := 0
@@ -482,26 +480,27 @@ func (m Model) renderHelpDialog() string {
 					line.WriteString(strings.Repeat(" ", colW))
 				}
 			}
-			contentLines = append(contentLines, strings.Repeat(" ", innerPad)+line.String())
+			contentLines = append(contentLines, strings.Repeat(" ", padL)+line.String()+strings.Repeat(" ", padR))
 		}
 	} else {
 		// Vertical stack layout
 		for _, g := range groups {
 			tag := " " + g.title + " "
-			contentLines = append(contentLines, strings.Repeat(" ", innerPad)+section.Render("─"+tag+"─"))
+			contentLines = append(contentLines, strings.Repeat(" ", padL)+section.Render("─"+tag+"─")+strings.Repeat(" ", padR))
 			for _, item := range g.items {
-				contentLines = append(contentLines, strings.Repeat(" ", innerPad)+pair(item[0], item[1]))
+				contentLines = append(contentLines, strings.Repeat(" ", padL)+pair(item[0], item[1])+strings.Repeat(" ", padR))
 			}
-			contentLines = append(contentLines, strings.Repeat(" ", innerPad))
+			contentLines = append(contentLines, strings.Repeat(" ", padL)+strings.Repeat(" ", padR))
 		}
 	}
 
 	// Footer
 	footerText := " esc or f1 to close "
 	dashW := max(contentWidth-lipgloss.Width(footerText), 0)
-	contentLines = append(contentLines, strings.Repeat(" ", innerPad)+info.Render(
+	footerContent := info.Render(
 		strings.Repeat("─", dashW/2)+footerText+strings.Repeat("─", dashW-dashW/2),
-	))
+	)
+	contentLines = append(contentLines, strings.Repeat(" ", padL)+footerContent+strings.Repeat(" ", padR))
 
 	// ── Apply borders: left, bottom, right (no top) ──
 	dialog := lipgloss.NewStyle().

@@ -8,7 +8,6 @@ const (
 	CutToClipboard      NotificationType = "cut_to_clipboard"
 	PastedFromClipboard NotificationType = "pasted_from_clipboard"
 	ExitConfirmation    NotificationType = "exit"
-	Saved               NotificationType = "saved"
 )
 
 func (nt NotificationType) Message() string {
@@ -21,8 +20,6 @@ func (nt NotificationType) Message() string {
 		return "Cut to clipboard"
 	case PastedFromClipboard:
 		return "Pasted"
-	case Saved:
-		return "Saved"
 	case ExitConfirmation:
 		return "Unsaved changes. Quit? (y/n)"
 	default:
