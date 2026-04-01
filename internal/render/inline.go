@@ -4,6 +4,8 @@ import (
 	"strings"
 
 	"github.com/z-d-g/md-cli/internal/markdown"
+
+	"charm.land/lipgloss/v2"
 )
 
 // ParseInlineElements delegates to the shared markdown package implementation.
@@ -12,45 +14,38 @@ func ParseInlineElements(line string) []InlineElement {
 }
 
 // RenderInline renders inline elements with styling, hiding markdown delimiters.
-func (renderer *lipglossRenderer) RenderInline(elements []InlineElement, base StyleFunc) string {
+// Styles compose via Inherit — one render call, clean ANSI output.
+func (renderer *lipglossRenderer) RenderInline(elements []InlineElement, base lipgloss.Style) string {
 	var result strings.Builder
 	result.Grow(len(elements) * 10)
 
 	for _, elem := range elements {
 		switch elem.Type {
 		case InlineText:
-			if base != nil {
-				result.WriteString(base(elem.Content))
-			} else {
-				result.WriteString(elem.Content)
-			}
+			result.WriteString(base.Render(elem.Content))
 		case InlineBold:
-			boldBase := base.Compose(renderer.styleCache.boldFunc)
-			content := renderer.RenderInline(elem.Children, boldBase)
+			content := renderer.RenderInline(elem.Children, base.Inherit(renderer.styles.Bold))
 			result.WriteString(content)
 		case InlineItalic:
-			italicBase := base.Compose(renderer.styleCache.italicFunc)
-			content := renderer.RenderInline(elem.Children, italicBase)
+			content := renderer.RenderInline(elem.Children, base.Inherit(renderer.styles.Italic))
 			result.WriteString(content)
 		case InlineBoldItalic:
-			composedBase := base.Compose(renderer.styleCache.boldFunc).Compose(renderer.styleCache.italicFunc)
-			content := renderer.RenderInline(elem.Children, composedBase)
+			biBase := base.Inherit(renderer.styles.Bold).Inherit(renderer.styles.Italic)
+			content := renderer.RenderInline(elem.Children, biBase)
 			result.WriteString(content)
 		case InlineUnderline:
-			underlineBase := base.Compose(renderer.styleCache.underlineFunc)
-			content := renderer.RenderInline(elem.Children, underlineBase)
+			content := renderer.RenderInline(elem.Children, base.Inherit(renderer.styles.Underline))
 			result.WriteString(content)
 		case InlineCode:
-			codeBase := base.Compose(renderer.styleCache.codeSpanFunc)
-			result.WriteString(codeBase(elem.Content))
+			codeBase := base.Inherit(renderer.styles.CodeSpan)
+			result.WriteString(codeBase.Render(elem.Content))
 		case InlineLink:
-			content := renderer.RenderInline(ParseInlineElements(elem.Content), nil)
+			content := renderer.RenderInline(ParseInlineElements(elem.Content), lipgloss.Style{})
 			result.WriteString(renderer.RenderLink(content, elem.URL))
 		case InlineImage:
 			result.WriteString(renderImageAlt(elem.Content, &renderer.styleCache))
 		case InlineStrikethrough:
-			strikeBase := base.Compose(renderer.styleCache.strikethroughFunc)
-			content := renderer.RenderInline(elem.Children, strikeBase)
+			content := renderer.RenderInline(elem.Children, base.Inherit(renderer.styles.Strikethrough))
 			result.WriteString(content)
 		}
 	}
@@ -59,74 +54,66 @@ func (renderer *lipglossRenderer) RenderInline(elements []InlineElement, base St
 }
 
 // RenderSourceInline renders inline elements showing markdown syntax with styling.
-func (renderer *lipglossRenderer) RenderSourceInline(elements []InlineElement, base StyleFunc) string {
+func (renderer *lipglossRenderer) RenderSourceInline(elements []InlineElement, base lipgloss.Style) string {
 	var result strings.Builder
 	result.Grow(len(elements) * 10)
 
 	for _, elem := range elements {
 		switch elem.Type {
 		case InlineText:
-			if base != nil {
-				result.WriteString(base(elem.Content))
-			} else {
-				result.WriteString(elem.Content)
-			}
+			result.WriteString(base.Render(elem.Content))
 		case InlineBold:
-			delim := base(elem.Delimiter)
+			delim := base.Render(elem.Delimiter)
 			result.WriteString(delim)
-			boldBase := base.Compose(renderer.styleCache.boldFunc)
-			content := renderer.RenderSourceInline(elem.Children, boldBase)
+			content := renderer.RenderSourceInline(elem.Children, base.Inherit(renderer.styles.Bold))
 			result.WriteString(content)
 			result.WriteString(delim)
 		case InlineItalic:
-			delim := base(elem.Delimiter)
+			delim := base.Render(elem.Delimiter)
 			result.WriteString(delim)
-			italicBase := base.Compose(renderer.styleCache.italicFunc)
-			content := renderer.RenderSourceInline(elem.Children, italicBase)
+			content := renderer.RenderSourceInline(elem.Children, base.Inherit(renderer.styles.Italic))
 			result.WriteString(content)
 			result.WriteString(delim)
 		case InlineBoldItalic:
-			delim := base(elem.Delimiter)
+			delim := base.Render(elem.Delimiter)
 			result.WriteString(delim)
-			composedBase := base.Compose(renderer.styleCache.boldFunc).Compose(renderer.styleCache.italicFunc)
-			content := renderer.RenderSourceInline(elem.Children, composedBase)
+			biBase := base.Inherit(renderer.styles.Bold).Inherit(renderer.styles.Italic)
+			content := renderer.RenderSourceInline(elem.Children, biBase)
 			result.WriteString(content)
 			result.WriteString(delim)
 		case InlineUnderline:
-			delim := base(elem.Delimiter)
+			delim := base.Render(elem.Delimiter)
 			result.WriteString(delim)
-			underlineBase := base.Compose(renderer.styleCache.underlineFunc)
-			content := renderer.RenderSourceInline(elem.Children, underlineBase)
+			content := renderer.RenderSourceInline(elem.Children, base.Inherit(renderer.styles.Underline))
 			result.WriteString(content)
 			result.WriteString(delim)
 		case InlineCode:
-			result.WriteString(base("`"))
-			codeBase := base.Compose(renderer.styleCache.codeSpanFunc)
-			result.WriteString(codeBase(elem.Content))
-			result.WriteString(base("`"))
+			result.WriteString(base.Render("`"))
+			codeBase := base.Inherit(renderer.styles.CodeSpan)
+			result.WriteString(codeBase.Render(elem.Content))
+			result.WriteString(base.Render("`"))
 		case InlineLink:
-			result.WriteString(base("["))
-			linkBase := base.Compose(renderer.styleCache.linkFunc)
+			result.WriteString(base.Render("["))
+			linkBase := base.Inherit(renderer.styles.Link)
 			content := renderer.RenderSourceInline(ParseInlineElements(elem.Content), linkBase)
 			result.WriteString(content)
-			result.WriteString(base("]("))
-			urlBase := base.Compose(renderer.styleCache.linkURLFunc)
-			result.WriteString(urlBase(elem.URL))
-			result.WriteString(base(")"))
+			result.WriteString(base.Render("]("))
+			urlBase := base.Inherit(renderer.styles.LinkURL)
+			result.WriteString(urlBase.Render(elem.URL))
+			result.WriteString(base.Render(")"))
 		case InlineImage:
-			result.WriteString(base("!["))
-			imageBase := base.Compose(renderer.styleCache.imageFunc)
+			result.WriteString(base.Render("!["))
+			imageBase := base.Inherit(renderer.styles.Image)
 			content := renderer.RenderSourceInline(ParseInlineElements(elem.Content), imageBase)
 			result.WriteString(content)
-			result.WriteString(base("]("))
-			urlBase := base.Compose(renderer.styleCache.linkURLFunc)
-			result.WriteString(urlBase(elem.URL))
-			result.WriteString(base(")"))
+			result.WriteString(base.Render("]("))
+			urlBase := base.Inherit(renderer.styles.LinkURL)
+			result.WriteString(urlBase.Render(elem.URL))
+			result.WriteString(base.Render(")"))
 		case InlineStrikethrough:
-			delim := base("~~")
+			delim := base.Render(elem.Delimiter)
 			result.WriteString(delim)
-			strikeBase := base.Compose(renderer.styleCache.strikethroughFunc)
-			content := renderer.RenderSourceInline(elem.Children, strikeBase)
+			content := renderer.RenderSourceInline(elem.Children, base.Inherit(renderer.styles.Strikethrough))
 			result.WriteString(content)
 			result.WriteString(delim)
 		}

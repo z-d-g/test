@@ -1,8 +1,6 @@
 package config
 
 import (
-	"image/color"
-
 	"charm.land/lipgloss/v2"
 )
 
@@ -47,49 +45,42 @@ type EditorStyles struct {
 	LineNumber     lipgloss.Style
 }
 
-func buildConfig(theme *Theme, darkBG bool) *Config {
-	fg := func(light, dark string) color.Color {
-		if darkBG {
-			return lipgloss.Color(dark)
-		}
-		return lipgloss.Color(light)
-	}
-
+func buildConfig(theme *Theme) *Config {
 	return &Config{
 		TitleStyle: lipgloss.NewStyle().
-			Background(fg(theme.TitleBg, theme.TitleBg)).
-			Foreground(fg(theme.TitleFg, theme.TitleFg)).
+			Background(lipgloss.Color(theme.TitleBg)).
+			Foreground(lipgloss.Color(theme.TitleFg)).
 			Padding(0, 1),
 
 		InfoStyle: lipgloss.NewStyle().
-			Foreground(fg(theme.InfoFg, theme.InfoFg)),
+			Foreground(lipgloss.Color(theme.InfoFg)),
 
 		HintStyle: lipgloss.NewStyle().
-			Foreground(fg(theme.HintFg, theme.HintFg)).
+			Foreground(lipgloss.Color(theme.HintFg)).
 			Italic(true),
 
 		UnsavedStyle: lipgloss.NewStyle().
-			Foreground(fg(theme.UnsavedFg, theme.UnsavedFg)).
+			Foreground(lipgloss.Color(theme.UnsavedFg)).
 			Bold(true),
 
 		SavedStyle: lipgloss.NewStyle().
-			Foreground(fg(theme.SavedFg, theme.SavedFg)).
+			Foreground(lipgloss.Color(theme.SavedFg)).
 			Bold(true),
 
 		HelpKeyStyle: lipgloss.NewStyle().
-			Foreground(fg(theme.HelpKeyFg, theme.HelpKeyFg)).
+			Foreground(lipgloss.Color(theme.HelpKeyFg)).
 			Bold(true),
 
 		HelpDescStyle: lipgloss.NewStyle().
-			Foreground(fg(theme.HelpDescFg, theme.HelpDescFg)),
+			Foreground(lipgloss.Color(theme.HelpDescFg)),
 
 		HelpSectionStyle: lipgloss.NewStyle().
-			Foreground(fg(theme.HelpSectionFg, theme.HelpSectionFg)).
+			Foreground(lipgloss.Color(theme.HelpSectionFg)).
 			Bold(true),
 
 		ModalBorderStyle: lipgloss.NewStyle().
 			Border(lipgloss.RoundedBorder(), false, true, true, true).
-			BorderForeground(fg(theme.ModalBorderFg, theme.ModalBorderFg)).
+			BorderForeground(lipgloss.Color(theme.ModalBorderFg)).
 			Padding(0, 1),
 
 		EditorStyles: theme.ToEditorStyles(),
@@ -97,9 +88,9 @@ func buildConfig(theme *Theme, darkBG bool) *Config {
 }
 
 func LoadConfig() *Config {
-	return buildConfig(DefaultTheme(), true)
+	return buildConfig(DefaultTheme())
 }
 
-func LoadConfigAdaptive(hasDarkBG bool) *Config {
-	return buildConfig(DefaultTheme(), hasDarkBG)
+func LoadConfigAdaptive(_ bool) *Config {
+	return buildConfig(DefaultTheme())
 }

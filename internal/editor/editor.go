@@ -9,6 +9,7 @@ import (
 	"github.com/z-d-g/md-cli/internal/render"
 
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type Editor struct {
@@ -308,7 +309,7 @@ func (e *Editor) stylizeSourceLine(line string, lineNum int) string {
 	lineType := markdown.ClassifyLine(line, e.frame.codeBlockLines[lineNum])
 	if lineType == markdown.LineNormal || lineType == markdown.LineBlockQuote {
 		elements := render.ParseInlineElements(line)
-		return e.renderer.RenderSourceInline(elements, nil)
+		return e.renderer.RenderSourceInline(elements, lipgloss.Style{})
 	}
 	return e.renderer.RenderStyled(line, lineType)
 }

@@ -2,6 +2,8 @@ package render
 
 import (
 	"strings"
+
+	"charm.land/lipgloss/v2"
 )
 
 // isCheckbox reports whether line is a task list item (e.g., "- [ ] " or "- [x]").
@@ -45,7 +47,7 @@ func renderCheckbox(line string, r *lipglossRenderer) string {
 	}
 
 	elements := ParseInlineElements(content)
-	styledContent := r.RenderInline(elements, nil)
+	styledContent := r.RenderInline(elements, lipgloss.Style{})
 	return r.styleCache.bulletFunc(checkboxChar+" ") + styledContent
 }
 
@@ -58,7 +60,7 @@ func renderNumberedList(line string, r *lipglossRenderer) string {
 
 	content := strings.TrimSpace(after)
 	elements := ParseInlineElements(content)
-	styledContent := r.RenderInline(elements, nil)
+	styledContent := r.RenderInline(elements, lipgloss.Style{})
 	return r.styleCache.bulletFunc(before+". ") + styledContent
 }
 
@@ -66,6 +68,6 @@ func renderNumberedList(line string, r *lipglossRenderer) string {
 func renderBulletList(line string, r *lipglossRenderer) string {
 	content := strings.TrimSpace(line[1:])
 	elements := ParseInlineElements(content)
-	styledContent := r.RenderInline(elements, nil)
+	styledContent := r.RenderInline(elements, lipgloss.Style{})
 	return r.styleCache.bulletFunc("• ") + styledContent
 }

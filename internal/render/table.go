@@ -163,7 +163,7 @@ func renderTableHeader(cells []string, r *lipglossRenderer) string {
 		}
 
 		elements := ParseInlineElements(cell)
-		styledCell := r.RenderInline(elements, r.styleCache.tableHeaderFunc)
+		styledCell := r.RenderInline(elements, r.styles.TableHeader)
 		aligned := alignText(styledCell, cellWidth, align)
 
 		b.WriteString(" ")
@@ -207,7 +207,7 @@ func renderTableRow(cells []string, r *lipglossRenderer) string {
 		}
 
 		elements := ParseInlineElements(cell)
-		styledCell := r.RenderInline(elements, r.styleCache.tableCellFunc)
+		styledCell := r.RenderInline(elements, r.styles.TableCell)
 		aligned := alignText(styledCell, cellWidth, align)
 
 		b.WriteString(" ")

@@ -71,31 +71,6 @@ func NewModel(filePath string, cfg *config.Config) Model {
 	}
 }
 
-func NewModelFromContent(content string, cfg *config.Config) Model {
-	edRenderer := render.NewLipglossRenderer(&cfg.EditorStyles)
-	ed := editor.NewEditor(content, edRenderer)
-
-	render.SetTableLines(func() []string {
-		lines := make([]string, ed.LineCount())
-		for i := range lines {
-			lines[i] = ed.LineAt(i)
-		}
-		return lines
-	})
-
-	ed.MarkClean()
-	ed.SetCursor(0, 0)
-	ed.Focus()
-
-	return Model{
-		Editor:       ed,
-		FilePath:     "stdin",
-		SavedContent: content,
-		Config:       cfg,
-		CursorStore:  nil,
-	}
-}
-
 func (m Model) Init() tea.Cmd {
 	return tea.RequestBackgroundColor
 }

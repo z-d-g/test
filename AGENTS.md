@@ -13,47 +13,48 @@ Go (Bubble Tea v2 + Lipgloss v2) terminal markdown editor with custom in-editor 
 ## Dependencies
 - `charm.land/bubbletea/v2` — TUI framework
 - `charm.land/lipgloss/v2` — Styling (value-based, `color.Color`)
-- `golang.design/x/clipboard` — System clipboard
+- `github.com/aymanbagabas/go-nativeclipboard` — System clipboard (CGO)
 
 ## Package Map
 
 ```
 internal/
 ├── app/           Bubble Tea model, CLI, print mode
-│   ├── cli.go       CLIArgs, PrintUsage
-│   ├── markdown.go  Print-mode via render.PrintRenderer
+│   ├── cli.go       CLIArgs, ParseCLIArgs, PrintUsage
+│   ├── markdown.go  HandlePrintMode, HandlePrintContent
 │   └── model.go     Model, View, Update, help dialog, notifications
 ├── config/        Theme → lipgloss styles
-│   ├── config.go    Config, EditorStyles, buildConfig
+│   ├── config.go    Config, EditorStyles, buildConfig, LoadConfig, LoadConfigAdaptive
 │   └── theme.go     Theme, DefaultTheme, ToEditorStyles
 ├── constants/     NotificationType, timing
-│   ├── notifications.go
-│   └── timing.go
+│   ├── notifications.go  NotificationType, Message()
+│   └── timing.go         NotificationDuration, TypingGroupTimeout, AnimationInterval/Step, MouseScrollLines
 ├── cursor/        Persistent cursor position (~/.cache/md-cli/)
-│   └── cursor.go    PositionStore
-├── markdown/      Framework-agnostic parsing
-│   ├── types.go       InlineType, InlineElement, SpanType, SyntaxSpan, line consts
-│   ├── classify.go    IsCodeFence, IsListLine, IsHeadingLine, ClassifyLine
+│   └── cursor.go    FileConfig, PositionStore, Get/Set/Remove
+├── markdown/      Framework-agnostic parsing, zero deps
+│   ├── types.go       InlineType, InlineElement, SpanType, SyntaxSpan, LineXxx consts
+│   ├── classify.go    IsCodeFence, CodeFenceChar, IsListLine, IsHeadingLine, IsTableLine, ClassifyLine, CountBlockquoteDepth, CountLeadingHashes
 │   ├── delimiter.go   FindClosingDelimiter
-│   └── inline.go      ParseInlineElements, FindSyntaxSpans
+│   └── inline.go      ParseInlineElements, FindSyntaxSpans, collectSpans
 ├── render/        LineRenderer interface + lipgloss impl
-│   ├── types.go       LineRenderer, StyleFunc, re-exports
-│   ├── renderer.go    lipglossRenderer, styleCache, RenderLine
+│   ├── types.go       LineRenderer interface, StyleFunc, re-exports from markdown
+│   ├── renderer.go    lipglossRenderer, styleCache, tableLines (global), RenderLine
 │   ├── inline.go      RenderInline, RenderSourceInline
-│   ├── table.go       Table rendering
-│   ├── list.go        Bullet/numbered/checkbox
-│   ├── image.go       Image placeholder
-│   └── print.go       PrintRenderer
+│   ├── table.go       tableContext, renderTable, parseTableCells, alignText
+│   ├── list.go        renderCheckbox, renderNumberedList, renderBulletList
+│   ├── image.go       renderImageAlt (renderImageIcon unused)
+│   └── print.go       PrintRenderer, RenderDocument
 ├── editor/        Buffer, nav, selection, undo, keys, view
-│   ├── gapbuffer.go   Byte gap buffer + line index + rune methods
-│   ├── editor.go      Editor model, View, caches
-│   ├── keybindings.go KeyBindings dispatch
-│   ├── navigation.go  Rune-aware cursor movement
-│   ├── selection.go   Selection model
-│   ├── undo.go        Undo/redo stacks + grouping
-│   ├── activeregion.go FindBlockRegion, bounds detection
-│   └── editor_test.go + *_test.go
-└── utils/         ReadFile, WriteFile, FilterMarkdownFiles
+│   ├── gapbuffer.go   GapBuffer (byte gap buffer + line index + rune methods)
+│   ├── editor.go      Editor, View, caches (renderCache, syntaxCache), frame state
+│   ├── keybindings.go KeyBindings dispatch, clipboard ops, typing groups
+│   ├── navigation.go  Navigation (rune-aware cursor movement, desiredCol)
+│   ├── selection.go   Selection (anchor/cursor, SelectAll/Word/Line)
+│   ├── undo.go        UndoManager (stack + grouping via GroupUndoEntries)
+│   ├── activeregion.go FindBlockRegion, isInCodeBlock, bounds detection
+│   └── *_test.go      Tests for editor, navigation, selection, undo, activeregion, rendercache
+└── utils/         ReadFile, WriteFile, IsMarkdownFile, FilterMarkdownFiles
+    └── file.go
 ```
 
 ## Architecture
@@ -85,9 +86,68 @@ Model.View → computeFrameState → visible lines
 
 ## Rendering Pipeline
 
-1. `markdown.ClassifyLine` → line type. Block detectors: `IsCodeFence`, `IsListLine`, `IsHeadingLine`, `IsTableLine`.
-2. `markdown.ParseInlineElements` → `[]InlineElement`. `FindSyntaxSpans` → `[]SyntaxSpan`.
-3. `render.LineRenderer.RenderLine(line, inCodeBlock)` — dispatches by line type.
-4. `editor.FindBlockRegion(buf, cursorRow)` — raw source for code blocks, tables, lists.
-5. `editor.View()` — rendered vs source per line, cursor/selection overlay.
-6. Cache: `renderCache map[int]cacheEntry`, `syntaxCache map[int][]SyntaxSpan`. Invalidated via `afterEdit(row)` / `afterMultiLineEdit()`.
+1. `markdown.ClassifyLine(line, inCodeBlock)` → line type constant.
+2. Block detectors: `IsCodeFence`, `IsListLine`, `IsHeadingLine`, `IsTableLine`.
+3. `markdown.ParseInlineElements(line)` → `[]InlineElement`. `FindSyntaxSpans(line)` → `[]SyntaxSpan`.
+4. `render.LineRenderer.RenderLine(line, inCodeBlock)` — dispatches by line type.
+5. `editor.FindBlockRegion(buf, cursorRow)` — raw source for code blocks, tables, lists, headings.
+6. `editor.View()` — rendered vs source per line, cursor/selection overlay.
+7. Cache: `renderCache map[int]cacheEntry`, `syntaxCache map[int][]SyntaxSpan`. Invalidated via `afterEdit(row)` / `afterMultiLineEdit()`.
+8. `computeFrameState()` pre-computes `frame.codeBlockLines[]` per frame (skipped if no edits).
+
+## Key Types & Interfaces
+
+```go
+// markdown/ — framework-agnostic
+type InlineType int; type InlineElement struct { Type, Content, URL, Delimiter, Children }
+type SpanType int; type SyntaxSpan struct { Start, End, SpanType }
+const LineNormal, LineHeading1..6, LineCodeFence, LineCodeContent, LineBlockQuote
+
+// render/ — abstraction over terminal styling
+type StyleFunc func(text string) string
+type LineRenderer interface {
+    RenderLine(line string, isInCodeBlock bool) string
+    RenderStyled(text string, lineType int) string
+    RenderInline(elements []InlineElement, base lipgloss.Style) string
+    RenderSourceInline(elements []InlineElement, base lipgloss.Style) string
+    RenderLineNumber(text string) string
+    RenderCursorChar(ch string) string
+    RenderSelectionChar(ch string) string
+    RenderLink(text, url string) string
+    TableVersion() int
+}
+
+// editor/ — core editing
+type GapBuffer struct { data, gapStart, gapEnd, capacity, lineStarts }
+type Editor struct { buf, nav, selection, undo, scroll, width, height, renderer, renderCache, syntaxCache, keyBindings, frame }
+type Navigation struct { buf, cursor, desiredCol }
+type Selection struct { active, anchor, cursor }
+type UndoManager struct { undoStack, redoStack, limit }
+type UndoEntry struct { offset, deleted, inserted, cursorBefore, cursorAfter }
+```
+
+## Undo Grouping
+
+Typing groups: rapid single-character inserts are merged into one `UndoEntry` lazily.
+- `typingGroupCount` tracks entries in current group
+- On next keypress after `TypingGroupTimeout` (500ms), `GroupUndoEntries(startIdx)` merges them
+- Non-typing operations (arrows, backspace, enter) call `endTypingGroup()` which resets counters
+- Limit: 500 undo entries
+
+## Active Region (Source Mode)
+
+Cursor position determines which lines show raw markdown source vs rendered output:
+- Inside code fence → entire fence region is raw
+- On table line → entire table block is raw
+- On list line → list block (with blank lines) is raw
+- On heading → heading line is raw
+- On blockquote → blockquote block is raw
+- On line with inline syntax (bold, italic, etc.) → that line is raw
+
+## Known Issues
+
+- Global `tableLines` for table width pre-computation (hidden coupling)
+- `render` re-exports `markdown` types (prefer `markdown.X` direct)
+- `isInCodeBlock` in `activeregion.go` recomputes from scratch (should use `frame.codeBlockLines`)
+- `endTypingGroup` resets counters without merging undo entries
+- `go-nativeclipboard` requires CGO

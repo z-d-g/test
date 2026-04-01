@@ -43,22 +43,13 @@ func TestToEditorStyles(t *testing.T) {
 func TestBuildConfig(t *testing.T) {
 	theme := DefaultTheme()
 
-	t.Run("dark bg", func(t *testing.T) {
-		cfg := buildConfig(theme, true)
-		if cfg == nil {
-			t.Fatal("buildConfig() returned nil")
-		}
-		if cfg.TitleStyle.GetForeground() == nil {
-			t.Error("TitleStyle foreground is nil")
-		}
-	})
-
-	t.Run("light bg", func(t *testing.T) {
-		cfg := buildConfig(theme, false)
-		if cfg == nil {
-			t.Fatal("buildConfig() returned nil")
-		}
-	})
+	cfg := buildConfig(theme)
+	if cfg == nil {
+		t.Fatal("buildConfig() returned nil")
+	}
+	if cfg.TitleStyle.GetForeground() == nil {
+		t.Error("TitleStyle foreground is nil")
+	}
 }
 
 func TestLoadConfig(t *testing.T) {

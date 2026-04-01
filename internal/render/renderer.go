@@ -164,7 +164,7 @@ func (r *lipglossRenderer) RenderLine(line string, isInCodeBlock bool) string {
 			content = strings.TrimSpace(content)
 		}
 		elements := ParseInlineElements(content)
-		styledContent := r.RenderInline(elements, nil)
+		styledContent := r.RenderInline(elements, lipgloss.Style{})
 		prefix := strings.Repeat("│ ", depth)
 		return r.styleCache.blockquoteFunc(prefix) + styledContent
 	}
@@ -223,5 +223,5 @@ func (r *lipglossRenderer) RenderLine(line string, isInCodeBlock bool) string {
 	}
 
 	elements := ParseInlineElements(line)
-	return r.RenderInline(elements, nil)
+	return r.RenderInline(elements, lipgloss.Style{})
 }
