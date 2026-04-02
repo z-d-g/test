@@ -8,12 +8,17 @@ import (
 
 // isCheckbox reports whether line is a task list item (e.g., "- [ ] " or "- [x]").
 func isCheckbox(line string) bool {
-	return strings.HasPrefix(line, "- [ ]") || strings.HasPrefix(line, "- [x]") ||
-		strings.HasPrefix(line, "- [X]") ||
-		strings.HasPrefix(line, "* [ ]") || strings.HasPrefix(line, "* [x]") ||
-		strings.HasPrefix(line, "* [X]") ||
-		strings.HasPrefix(line, "+ [ ]") || strings.HasPrefix(line, "+ [x]") ||
-		strings.HasPrefix(line, "+ [X]")
+	trimmed := strings.TrimSpace(line)
+	if !isBulletStart(trimmed) {
+		return false
+	}
+	rest := trimmed[1:]
+	rest = strings.TrimSpace(rest)
+	return strings.HasPrefix(rest, "[ ]") || strings.HasPrefix(rest, "[x]") || strings.HasPrefix(rest, "[X]")
+}
+
+func isBulletStart(line string) bool {
+	return len(line) > 0 && (line[0] == '-' || line[0] == '*' || line[0] == '+')
 }
 
 // isNumberedList reports whether line starts a numbered list item (e.g., "1. ").
@@ -33,19 +38,26 @@ func isNumberedList(line string) bool {
 
 // renderCheckbox renders a task list item with checkmark styling.
 func renderCheckbox(line string, r *lipglossRenderer) string {
-	var checkboxChar string
-	var content string
+	trimmed := strings.TrimSpace(line)
+	rest := trimmed[1:]
+	rest = strings.TrimSpace(rest)
 
-	if strings.HasPrefix(line, "- [x]") || strings.HasPrefix(line, "- [X]") ||
-		strings.HasPrefix(line, "* [x]") || strings.HasPrefix(line, "* [X]") ||
-		strings.HasPrefix(line, "+ [x]") || strings.HasPrefix(line, "+ [X]") {
+	var checkboxChar string
+	contentStart := 3
+
+	if strings.HasPrefix(rest, "[x]") || strings.HasPrefix(rest, "[X]") {
 		checkboxChar = "✓"
-		content = strings.TrimSpace(line[5:])
+		if len(rest) > 3 && rest[3] == ' ' {
+			contentStart = 4
+		}
 	} else {
 		checkboxChar = "☐"
-		content = strings.TrimSpace(line[5:])
+		if len(rest) > 3 && rest[3] == ' ' {
+			contentStart = 4
+		}
 	}
 
+	content := strings.TrimSpace(rest[contentStart:])
 	elements := ParseInlineElements(content)
 	styledContent := r.RenderInline(elements, lipgloss.Style{})
 	return r.styleCache.bulletFunc(checkboxChar+" ") + styledContent

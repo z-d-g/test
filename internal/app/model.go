@@ -14,11 +14,18 @@ import (
 	"github.com/z-d-g/md-cli/internal/utils"
 
 	tea "charm.land/bubbletea/v2"
-
 	"charm.land/lipgloss/v2"
+	"github.com/mattn/go-runewidth"
 )
 
-// Model represents the application state
+type modelState int
+
+const (
+	stateNormal modelState = iota
+	stateExitConfirm
+	stateHelpDialog
+)
+
 type Model struct {
 	Editor         *editor.Editor
 	FilePath       string
@@ -26,7 +33,7 @@ type Model struct {
 	Width          int
 	Height         int
 	SavedContent   string
-	ShowHelpDialog bool
+	state          modelState
 	HelpAnimOffset float64
 	HelpAnimDir    float64
 	Notification   string
@@ -46,10 +53,10 @@ func NewModel(filePath string, cfg *config.Config) Model {
 		cursorStore = nil
 	}
 
-	edRenderer := render.NewLipglossRenderer(&cfg.EditorStyles)
+	edRenderer := render.NewLipglossRenderer(&cfg.EditorStyles, 0)
 	ed := editor.NewEditor(content, edRenderer)
 
-	render.SetTableLines(func() []string {
+	edRenderer.SetDocument(func() []string {
 		lines := make([]string, ed.LineCount())
 		for i := range lines {
 			lines[i] = ed.LineAt(i)
@@ -58,7 +65,11 @@ func NewModel(filePath string, cfg *config.Config) Model {
 	})
 
 	ed.MarkClean()
-	ed.SetCursor(0, 0)
+	if cursorStore != nil {
+		if pos, ok := cursorStore.GetPosition(filePath); ok {
+			ed.SetCursor(pos.CursorLine, pos.CursorCol)
+		}
+	}
 	ed.Focus()
 
 	return Model{
@@ -75,10 +86,10 @@ func (m Model) Init() tea.Cmd {
 }
 
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
-	if m.Notification == "exit" {
+	switch m.state {
+	case stateExitConfirm:
 		return m.handleExitConfirm(msg)
-	}
-	if m.ShowHelpDialog || m.HelpAnimDir != 0.0 {
+	case stateHelpDialog:
 		if model, cmd, consumed := m.handleHelpDialog(msg); consumed {
 			return model, cmd
 		}
@@ -87,24 +98,30 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleExitConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
-	km, ok := msg.(tea.KeyMsg)
-	if !ok {
-		return m, nil
-	}
-	switch km.String() {
-	case "y", "Y", "ctrl+q":
-		m.saveCursorPosition()
-		m.Editor.MarkClean()
-		return m, tea.Quit
-	case "n", "N", "esc":
-		m.Notification = ""
-		return m, nil
-	case "ctrl+s":
-		if err := m.saveFile(); err != nil {
-			m.Notification = "save error"
-		} else {
+	switch msg := msg.(type) {
+	case tea.KeyPressMsg:
+		switch msg.String() {
+		case "y", "Y", "ctrl+q":
+			m.saveCursorPosition()
+			m.Editor.MarkClean()
+			return m, tea.Quit
+		case "n", "N", "esc":
 			m.Notification = ""
+			m.state = stateNormal
+			return m, nil
+		case "ctrl+s":
+			if err := m.saveFile(); err != nil {
+				slog.Error("error saving file", "err", err, "file", m.FilePath)
+				m.Notification = "save error"
+			} else {
+				m.saveCursorPosition()
+				m.SavedContent = m.Editor.Value()
+				m.Editor.MarkClean()
+			}
+			return m, nil
 		}
+	case tea.WindowSizeMsg:
+		m.applyWindowSize(msg)
 		return m, nil
 	}
 	return m, nil
@@ -112,28 +129,29 @@ func (m Model) handleExitConfirm(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleHelpDialog(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	switch msg := msg.(type) {
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		if msg.String() == "esc" || msg.String() == "f1" {
-			if m.HelpAnimDir == 0.0 || m.HelpAnimDir == 1.0 {
-				m.HelpAnimDir = -1.0
-				return m, tickAnim(), true
-			}
-			return m, nil, true
+			m.HelpAnimDir = -1.0
 		}
 	case animTickMsg:
+		wasOpening := m.HelpAnimDir > 0
 		m.updateHelpAnim()
 		if m.HelpAnimDir != 0.0 {
 			return m, tickAnim(), true
 		}
+		if wasOpening {
+			return m, nil, true
+		}
+		m.state = stateNormal
 		return m, nil, true
 	case tea.WindowSizeMsg:
 		m.applyWindowSize(msg)
-		return m, nil, true
 	}
-	if m.HelpAnimDir == 0.0 && m.ShowHelpDialog {
-		return m, nil, true
+
+	if m.HelpAnimDir != 0.0 {
+		return m, tickAnim(), true
 	}
-	return m, nil, false
+	return m, nil, true
 }
 
 func (m Model) handleMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -169,15 +187,21 @@ func (m Model) handleKeyPress(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "ctrl+q":
 		if m.Editor.IsDirty() {
-			m.Notification = "exit"
+			m.Notification = string(constants.ExitConfirmation)
+			m.state = stateExitConfirm
 			return m, nil
 		}
 		m.saveCursorPosition()
 		return m, tea.Quit
 	case "f1":
-		if !m.ShowHelpDialog && m.HelpAnimDir == 0.0 {
-			m.ShowHelpDialog = true
+		if m.state != stateHelpDialog && m.HelpAnimDir == 0.0 {
+			m.state = stateHelpDialog
+			m.HelpAnimOffset = 0.0
 			m.HelpAnimDir = 1.0
+			return m, tickAnim()
+		}
+		if m.state == stateHelpDialog {
+			m.HelpAnimDir = -1.0
 			return m, tickAnim()
 		}
 		return m, nil
@@ -239,17 +263,12 @@ func (m Model) View() tea.View {
 
 	if m.Editor != nil {
 		editorContent := m.Editor.View().Content
-
-		if m.ShowHelpDialog || m.HelpAnimDir != 0.0 {
-			editorLines := strings.Split(editorContent, "\n")
-			helpDialog := m.renderHelpDialog()
-			if len(helpDialog) > 0 {
-				helpLines := strings.Split(strings.TrimRight(helpDialog, "\n"), "\n")
-				for i := 0; i < len(helpLines) && i < len(editorLines); i++ {
-					editorLines[i] = helpLines[i]
-				}
+		if m.state == stateHelpDialog || m.HelpAnimDir != 0.0 {
+			if overlay := m.renderHelpOverlay(editorContent); overlay != "" {
+				b.WriteString(overlay)
+			} else {
+				b.WriteString(editorContent)
 			}
-			b.WriteString(strings.Join(editorLines, "\n"))
 		} else {
 			b.WriteString(editorContent)
 		}
@@ -269,11 +288,9 @@ func (m *Model) updateHelpAnim() {
 	if m.HelpAnimOffset >= 1.0 {
 		m.HelpAnimOffset = 1.0
 		m.HelpAnimDir = 0.0
-		m.ShowHelpDialog = true
 	} else if m.HelpAnimOffset <= 0.0 {
 		m.HelpAnimOffset = 0.0
 		m.HelpAnimDir = 0.0
-		m.ShowHelpDialog = false
 	}
 }
 
@@ -308,18 +325,31 @@ func truncateText(text string, maxWidth int) string {
 	if lipgloss.Width(text) <= maxWidth {
 		return text
 	}
-	if maxWidth == 1 {
-		return "…"
+	return truncWithEllipsis(text, maxWidth)
+}
+
+const statusMinWidth = 28
+
+func (m Model) statusMessage() string {
+	msg := m.getNotificationMessage()
+	budget := max(m.Width/4, statusMinWidth)
+	return truncateText(msg, budget)
+}
+
+func truncWithEllipsis(text string, maxWidth int) string {
+	suffix := "…"
+	budget := maxWidth - 1
+	if budget <= 0 {
+		return suffix
 	}
-	runes := []rune(text)
-	for len(runes) > 0 {
-		candidate := string(runes) + "…"
-		if lipgloss.Width(candidate) <= maxWidth {
-			return candidate
+	var totalW int
+	for i, r := range text {
+		if totalW+runewidth.RuneWidth(r) > budget {
+			return text[:i] + suffix
 		}
-		runes = runes[:len(runes)-1]
+		totalW += runewidth.RuneWidth(r)
 	}
-	return "…"
+	return text
 }
 
 func (m Model) renderTopBar() string {
@@ -329,7 +359,7 @@ func (m Model) renderTopBar() string {
 
 	title := m.Config.TitleStyle.Render("md-cli")
 	helpHint := m.Config.HintStyle.Render(" [f1:?]")
-	left := title + helpHint
+	leftLabel := title + helpHint
 
 	dirty := m.Editor != nil && m.Editor.IsDirty()
 	dotStyle := m.Config.SavedStyle
@@ -340,23 +370,35 @@ func (m Model) renderTopBar() string {
 
 	right := dot
 	if m.Notification != "" {
-		statusMsg := truncateText(m.getNotificationMessage(), m.Width/4)
+		statusMsg := m.statusMessage()
 		statusStyle := m.Config.InfoStyle
-		if m.Notification == "exit" {
+		if m.state == stateExitConfirm {
 			statusStyle = m.Config.UnsavedStyle
 		}
 		right = statusStyle.Render(statusMsg) + " " + dot
 	}
 
-	filename := truncateText(filepath.Base(m.FilePath), m.Width/3)
-	center := m.Config.InfoStyle.Render(filename)
+	filename := truncateText(filepath.Base(m.FilePath), m.Width/2)
+	fileNameStyled := m.Config.InfoStyle.Render(filename)
 
-	leftW := lipgloss.Width(left)
-	centerW := lipgloss.Width(center)
+	leftW := lipgloss.Width(leftLabel)
 	rightW := lipgloss.Width(right)
-	gap := max(m.Width-leftW-rightW, centerW)
+	remaining := m.Width - leftW - rightW - 3
 
-	return left + lipgloss.PlaceHorizontal(gap, lipgloss.Center, center) + right
+	if remaining > 20 {
+		fillW := max(remaining-lipgloss.Width(fileNameStyled)-1, 1)
+		fill := m.Config.HintStyle.Render(strings.Repeat("─", fillW))
+		return leftLabel + " " + fileNameStyled + " " + fill + " " + right
+	}
+
+	fillW := max(remaining-lipgloss.Width(fileNameStyled), 0)
+	if fillW > 0 {
+		fill := m.Config.HintStyle.Render(strings.Repeat("─", fillW))
+		return leftLabel + " " + fill + " " + right
+	}
+
+	gap := max(m.Width-leftW-rightW, 1)
+	return leftLabel + lipgloss.PlaceHorizontal(gap, lipgloss.Right, "") + right
 }
 
 func (m Model) getNotificationMessage() string {
@@ -380,25 +422,42 @@ func easeOutQuart(x float64) float64 {
 	return 1.0 - (1.0-x)*(1.0-x)*(1.0-x)*(1.0-x)
 }
 
-// renderHelpDialog renders the help dialog.
-// Groups are arranged in two rows of columns, wrapped in a lipgloss border (left, bottom, right).
-// Animation: pulls down from top.
-func (m Model) renderHelpDialog() string {
-	if m.Editor == nil || m.Width < 30 {
-		return ""
+func (m Model) renderHelpOverlay(editorContent string) string {
+	if m.Editor == nil || m.Width < 30 || m.Height <= 0 {
+		return editorContent
 	}
 
-	easedOffset := easeOutQuart(m.HelpAnimOffset)
-	if easedOffset <= 0 {
-		return ""
+	dialog := m.renderHelpDialogContent(m.Config.HelpKeyStyle, m.Config.HelpDescStyle, m.Config.HelpSectionStyle, m.Config.InfoStyle)
+	if dialog == "" {
+		return editorContent
 	}
 
-	key := m.Config.HelpKeyStyle
-	desc := m.Config.HelpDescStyle
-	section := m.Config.HelpSectionStyle
-	info := m.Config.InfoStyle
+	editorLines := strings.Split(editorContent, "\n")
+	dialogLines := strings.Split(strings.TrimRight(dialog, "\n"), "\n")
+	if len(dialogLines) == 0 {
+		return editorContent
+	}
+	viewport := m.Height - m.reservedRows()
 
-	// ── Group data ──
+	lines := make([]string, min(viewport, len(editorLines)))
+	copy(lines, editorLines[:len(lines)])
+
+	// Dialog slides from above viewport down into position
+	// topOffset = rows of dialog still above viewport
+	topOffset := int((1.0 - easeOutQuart(m.HelpAnimOffset)) * float64(len(dialogLines)))
+
+	for i := topOffset; i < len(dialogLines); i++ {
+		row := i - topOffset
+		if row >= len(lines) {
+			break
+		}
+		lines[row] = dialogLines[i]
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func (m Model) renderHelpDialogContent(key, desc, section, info lipgloss.Style) string {
 	type kv = [2]string
 	type group struct {
 		title string
@@ -412,13 +471,11 @@ func (m Model) renderHelpDialog() string {
 		{"Edit", []kv{{"Ctrl+C", "Copy"}, {"Ctrl+X", "Cut"}, {"Ctrl+V", "Paste"}, {"Ctrl+Z/Y", "Undo/Redo"}, {"Bksp/Del", "Delete"}, {"Alt+Bksp/Del", "Word del"}}},
 	}
 
-	// ── Build content lines ──
 	padL := 2
 	padR := 1
-	borderW := 2 // lipgloss RoundedBorder: 1 left + 1 right
+	borderW := 2
 	contentWidth := m.Width - borderW - padL - padR
 
-	// Find max key width for alignment
 	maxKeyW := 0
 	for _, g := range groups {
 		for _, item := range g.items {
@@ -435,14 +492,11 @@ func (m Model) renderHelpDialog() string {
 		return kRendered + strings.Repeat(" ", max(1, pad+1)) + desc.Render(strings.ToLower(d))
 	}
 
-	// ── Layout: columns if wide enough, vertical stack if narrow ──
 	var contentLines []string
 
 	if contentWidth >= 83 {
-		// Column layout
 		colW := (contentWidth - (len(groups) - 1)) / len(groups)
 
-		// Headers
 		var headerLine strings.Builder
 		for i, g := range groups {
 			if i > 0 {
@@ -456,9 +510,9 @@ func (m Model) renderHelpDialog() string {
 				headerLine.WriteString(strings.Repeat(" ", headerPad))
 			}
 		}
-		contentLines = append(contentLines, strings.Repeat(" ", padL)+headerLine.String()+strings.Repeat(" ", padR))
+		contentLines = append(contentLines,
+			strings.Repeat(" ", padL)+headerLine.String()+strings.Repeat(" ", padR))
 
-		// Items interleaved
 		maxItems := 0
 		for _, g := range groups {
 			maxItems = max(maxItems, len(g.items))
@@ -480,47 +534,37 @@ func (m Model) renderHelpDialog() string {
 					line.WriteString(strings.Repeat(" ", colW))
 				}
 			}
-			contentLines = append(contentLines, strings.Repeat(" ", padL)+line.String()+strings.Repeat(" ", padR))
+			contentLines = append(contentLines,
+				strings.Repeat(" ", padL)+line.String()+strings.Repeat(" ", padR))
 		}
 	} else {
-		// Vertical stack layout
 		for _, g := range groups {
 			tag := " " + g.title + " "
-			contentLines = append(contentLines, strings.Repeat(" ", padL)+section.Render("─"+tag+"─")+strings.Repeat(" ", padR))
+			contentLines = append(contentLines,
+				strings.Repeat(" ", padL)+section.Render("─"+tag+"─")+strings.Repeat(" ", padR))
 			for _, item := range g.items {
-				contentLines = append(contentLines, strings.Repeat(" ", padL)+pair(item[0], item[1])+strings.Repeat(" ", padR))
+				contentLines = append(contentLines,
+					strings.Repeat(" ", padL)+pair(item[0], item[1])+strings.Repeat(" ", padR))
 			}
-			contentLines = append(contentLines, strings.Repeat(" ", padL)+strings.Repeat(" ", padR))
+			contentLines = append(contentLines,
+				strings.Repeat(" ", padL)+strings.Repeat(" ", padR))
 		}
 	}
 
-	// Footer
 	footerText := " esc or f1 to close "
 	dashW := max(contentWidth-lipgloss.Width(footerText), 0)
 	footerContent := info.Render(
 		strings.Repeat("─", dashW/2)+footerText+strings.Repeat("─", dashW-dashW/2),
 	)
-	contentLines = append(contentLines, strings.Repeat(" ", padL)+footerContent+strings.Repeat(" ", padR))
+	contentLines = append(contentLines,
+		strings.Repeat(" ", padL)+footerContent+strings.Repeat(" ", padR))
 
-	// ── Apply borders: left, bottom, right (no top) ──
 	dialog := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder(), false, true, true, true).
 		BorderForeground(m.Config.ModalBorderStyle.GetBorderBottomForeground()).
 		Render(strings.Join(contentLines, "\n"))
 
-	// ── Animate: pull down from top ──
-	dialogLines := strings.Split(dialog, "\n")
-	visibleCount := int(easedOffset * float64(len(dialogLines)))
-	if visibleCount == 0 {
-		return ""
-	}
-
-	var result strings.Builder
-	for _, line := range dialogLines[:visibleCount] {
-		result.WriteString(line)
-		result.WriteByte('\n')
-	}
-	return result.String()
+	return dialog
 }
 
 func (m *Model) showTemporaryNotification(_ string) tea.Cmd {

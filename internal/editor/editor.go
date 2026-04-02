@@ -526,6 +526,7 @@ func (e *Editor) afterMultiLineEdit() {
 func (e *Editor) SetSize(width, height int) {
 	e.width = width
 	e.height = height
+	e.renderer.SetTerminalWidth(width)
 }
 
 func (e *Editor) Focus() {

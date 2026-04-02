@@ -120,8 +120,6 @@ func IsEmptyLine(line string) bool {
 	return len(strings.TrimSpace(line)) == 0
 }
 
-// ClassifyLine determines the line type for styled rendering.
-// isInCodeBlock indicates whether this line falls within a fenced code block.
 func ClassifyLine(line string, isInCodeBlock bool) int {
 	if isInCodeBlock {
 		return LineCodeContent
@@ -137,23 +135,9 @@ func ClassifyLine(line string, isInCodeBlock bool) int {
 		return LineBlockQuote
 	}
 
-	if strings.HasPrefix(trimmed, "###### ") {
-		return LineHeading6
-	}
-	if strings.HasPrefix(trimmed, "##### ") {
-		return LineHeading5
-	}
-	if strings.HasPrefix(trimmed, "#### ") {
-		return LineHeading4
-	}
-	if strings.HasPrefix(trimmed, "### ") {
-		return LineHeading3
-	}
-	if strings.HasPrefix(trimmed, "## ") {
-		return LineHeading2
-	}
-	if strings.HasPrefix(trimmed, "# ") {
-		return LineHeading1
+	hashCount := CountLeadingHashes(line)
+	if hashCount > 0 && len(trimmed) > hashCount && trimmed[hashCount] == ' ' {
+		return hashCount
 	}
 
 	return LineNormal

@@ -20,7 +20,7 @@ func lineCount(s string) int {
 
 func testEditor(content string) *editor.Editor {
 	cfg := config.LoadConfig()
-	r := render.NewLipglossRenderer(&cfg.EditorStyles)
+	r := render.NewLipglossRenderer(&cfg.EditorStyles, 80)
 	return editor.NewEditor(content, r)
 }
 

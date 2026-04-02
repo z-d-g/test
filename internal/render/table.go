@@ -59,8 +59,8 @@ func (r *lipglossRenderer) computeTableWidths(currentLine string) {
 		widths[i] = max(lipgloss.Width(cell), 3)
 	}
 
-	if tableLines != nil {
-		lines := tableLines()
+	if r.documentLines != nil {
+		lines := r.documentLines()
 		foundCurrent := false
 		for _, line := range lines {
 			if line == currentLine {

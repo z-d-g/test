@@ -14,6 +14,7 @@ Go (Bubble Tea v2 + Lipgloss v2) terminal markdown editor with custom in-editor 
 - `charm.land/bubbletea/v2` — TUI framework
 - `charm.land/lipgloss/v2` — Styling (value-based, `color.Color`)
 - `github.com/aymanbagabas/go-nativeclipboard` — System clipboard (CGO=0)
+- `github.com/mattn/go-runewidth` — Unicode-aware cell width
 
 ## Package Map
 
@@ -33,12 +34,12 @@ internal/
 │   └── cursor.go    FileConfig, PositionStore, Get/Set/Remove
 ├── markdown/      Framework-agnostic parsing, zero deps
 │   ├── types.go       InlineType, InlineElement, SpanType, SyntaxSpan, LineXxx consts
-│   ├── classify.go    IsCodeFence, CodeFenceChar, IsListLine, IsHeadingLine, IsTableLine, ClassifyLine, CountBlockquoteDepth, CountLeadingHashes
+│   ├── classify.go    IsCodeFence, CodeFenceChar, IsBlockquoteLine, IsHorizontalRule, IsListLine, IsHeadingLine, IsTableLine, ClassifyLine, CountBlockquoteDepth, CountLeadingHashes
 │   ├── delimiter.go   FindClosingDelimiter
 │   └── inline.go      ParseInlineElements, FindSyntaxSpans, collectSpans
 ├── render/        LineRenderer interface + lipgloss impl
 │   ├── types.go       LineRenderer interface, StyleFunc, re-exports from markdown
-│   ├── renderer.go    lipglossRenderer, styleCache, tableLines (global), RenderLine
+│   ├── renderer.go    lipglossRenderer, styleCache, documentLines, terminalWidth, SetDocument, SetTerminalWidth, RenderLine
 │   ├── inline.go      RenderInline, RenderSourceInline
 │   ├── table.go       tableContext, renderTable, parseTableCells, alignText
 │   ├── list.go        renderCheckbox, renderNumberedList, renderBulletList
@@ -86,14 +87,13 @@ Model.View → computeFrameState → visible lines
 
 ## Rendering Pipeline
 
-1. `markdown.ClassifyLine(line, inCodeBlock)` → line type constant.
-2. Block detectors: `IsCodeFence`, `IsListLine`, `IsHeadingLine`, `IsTableLine`.
-3. `markdown.ParseInlineElements(line)` → `[]InlineElement`. `FindSyntaxSpans(line)` → `[]SyntaxSpan`.
-4. `render.LineRenderer.RenderLine(line, inCodeBlock)` — dispatches by line type.
-5. `editor.FindBlockRegion(buf, cursorRow)` — raw source for code blocks, tables, lists, headings.
-6. `editor.View()` — rendered vs source per line, cursor/selection overlay.
-7. Cache: `renderCache map[int]cacheEntry`, `syntaxCache map[int][]SyntaxSpan`. Invalidated via `afterEdit(row)` / `afterMultiLineEdit()`.
-8. `computeFrameState()` pre-computes `frame.codeBlockLines[]` per frame (skipped if no edits).
+1. `render.RenderLine(line, inCodeBlock)` — dispatches to block detectors (`IsCodeFence`, `IsListLine`, `IsHeadingLine`, `IsTableLine`, etc.).
+2. `markdown.ParseInlineElements(line)` → `[]InlineElement`. `FindSyntaxSpans(line)` → `[]SyntaxSpan`.
+3. `LineRenderer.RenderInline(elements)` / `RenderSourceInline(elements)` — styled output.
+4. `editor.FindBlockRegion(buf, cursorRow)` — raw source for code blocks, tables, lists, headings.
+5. `editor.View()` — rendered vs source per line, cursor/selection overlay.
+6. Cache: `renderCache map[int]cacheEntry`, `syntaxCache map[int][]SyntaxSpan`. Invalidated via `afterEdit(row)` / `afterMultiLineEdit()`.
+7. `computeFrameState()` pre-computes `frame.codeBlockLines[]` per frame (skipped if no edits).
 
 ## Key Types & Interfaces
 
@@ -106,6 +106,9 @@ const LineNormal, LineHeading1..6, LineCodeFence, LineCodeContent, LineBlockQuot
 // render/ — abstraction over terminal styling
 type StyleFunc func(text string) string
 type LineRenderer interface {
+    SetDocument(lines func() []string)
+    SetTerminalWidth(w int)
+    TerminalWidth() int
     RenderLine(line string, isInCodeBlock bool) string
     RenderStyled(text string, lineType int) string
     RenderInline(elements []InlineElement, base lipgloss.Style) string

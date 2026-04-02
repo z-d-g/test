@@ -9,10 +9,6 @@ import (
 	"charm.land/lipgloss/v2"
 )
 
-// tableLines provides the full document for table width computation.
-// Set by the editor before rendering; nil when not available.
-var tableLines func() []string
-
 // styleCache holds pre-built StyleFuncs for inline rendering performance.
 type styleCache struct {
 	boldFunc          StyleFunc
@@ -43,17 +39,20 @@ type styleCache struct {
 
 // lipglossRenderer implements LineRenderer using lipgloss for rendering.
 type lipglossRenderer struct {
-	styles         *config.EditorStyles
-	styleCache     styleCache
-	lineNumberFunc StyleFunc
-	table          tableContext
-	tableVersion   int
+	styles          *config.EditorStyles
+	styleCache      styleCache
+	lineNumberFunc  StyleFunc
+	table           tableContext
+	tableVersion    int
+	documentLines   func() []string
+	terminalWidth   int
 }
 
 // NewLipglossRenderer creates a LineRenderer backed by lipgloss.
-func NewLipglossRenderer(styles *config.EditorStyles) LineRenderer {
+func NewLipglossRenderer(styles *config.EditorStyles, width int) LineRenderer {
 	r := &lipglossRenderer{
-		styles: styles,
+		styles:        styles,
+		terminalWidth: width,
 	}
 
 	r.styleCache = styleCache{
@@ -87,6 +86,20 @@ func NewLipglossRenderer(styles *config.EditorStyles) LineRenderer {
 
 	return r
 }
+
+func (r *lipglossRenderer) SetDocument(lines func() []string) {
+	r.documentLines = lines
+}
+
+func (r *lipglossRenderer) SetTerminalWidth(w int) {
+	r.terminalWidth = w
+}
+
+func (r *lipglossRenderer) TerminalWidth() int {
+	return r.terminalWidth
+}
+
+
 
 func (r *lipglossRenderer) RenderLineNumber(text string) string {
 	return r.lineNumberFunc(text)
@@ -142,14 +155,10 @@ func (r *lipglossRenderer) TableVersion() int {
 	return r.tableVersion
 }
 
-// SetTableLines sets the document line source for table width pre-computation.
-func SetTableLines(lines func() []string) {
-	tableLines = lines
-}
-
 func (r *lipglossRenderer) RenderLine(line string, isInCodeBlock bool) string {
 	if markdown.IsCodeFence(line) {
-		return r.styleCache.codeFenceFunc("┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄")
+		w := max(r.terminalWidth-4, 10)
+		return r.styleCache.codeFenceFunc(strings.Repeat("┄", w))
 	}
 
 	if isInCodeBlock {
@@ -170,7 +179,8 @@ func (r *lipglossRenderer) RenderLine(line string, isInCodeBlock bool) string {
 	}
 
 	if markdown.IsHorizontalRule(line) {
-		return r.styleCache.hrFunc("──────────────────────────────────────────────")
+		w := max(r.terminalWidth-4, 10)
+		return r.styleCache.hrFunc(strings.Repeat("─", w))
 	}
 
 	if markdown.IsHeadingLine(line) {

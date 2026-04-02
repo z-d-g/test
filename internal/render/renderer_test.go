@@ -11,7 +11,7 @@ import (
 
 func testRenderer() LineRenderer {
 	styles := config.DefaultTheme().ToEditorStyles()
-	return NewLipglossRenderer(&styles)
+	return NewLipglossRenderer(&styles, 80)
 }
 
 func TestRenderLineHeading(t *testing.T) {
@@ -89,10 +89,10 @@ func TestRenderLineList(t *testing.T) {
 
 func TestRenderLineTable(t *testing.T) {
 	r := testRenderer()
-	SetTableLines(func() []string {
+	r.SetDocument(func() []string {
 		return []string{"| A | B |", "|---|---|", "| 1 | 2 |"}
 	})
-	defer SetTableLines(nil)
+	defer r.SetDocument(nil)
 
 	result := r.RenderLine("| A | B |", false)
 	if result == "" {
@@ -248,8 +248,8 @@ func TestRenderInlineUnderline(t *testing.T) {
 func TestRenderTableFull(t *testing.T) {
 	r := testRenderer()
 	lines := []string{"| H1 | H2 |", "|---|---|", "| R1 | R2 |"}
-	SetTableLines(func() []string { return lines })
-	defer SetTableLines(nil)
+	r.SetDocument(func() []string { return lines })
+	defer r.SetDocument(nil)
 
 	renderer := r.(*lipglossRenderer)
 

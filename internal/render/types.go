@@ -33,7 +33,10 @@ type LineRenderer interface {
 	RenderCursorChar(ch string) string
 	RenderSelectionChar(ch string) string
 	RenderLink(text, url string) string
+	SetDocument(lines func() []string)
+	SetTerminalWidth(w int)
 	TableVersion() int
+	TerminalWidth() int
 }
 
 const (

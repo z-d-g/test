@@ -24,8 +24,8 @@ func (p *PrintRenderer) RenderDocument(content string) string {
 	lines := strings.Split(content, "\n")
 
 	// Provide document lines for table width pre-computation
-	SetTableLines(func() []string { return lines })
-	defer SetTableLines(nil)
+	p.renderer.SetDocument(func() []string { return lines })
+	defer p.renderer.SetDocument(nil)
 
 	var b strings.Builder
 	b.Grow(len(content) * 2)

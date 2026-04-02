@@ -24,7 +24,7 @@ func containsMarkdownSyntax(s string) bool {
 func testRendererFromTheme() render.LineRenderer {
 	theme := config.DefaultTheme()
 	styles := theme.ToEditorStyles()
-	return render.NewLipglossRenderer(&styles)
+	return render.NewLipglossRenderer(&styles, 80)
 }
 
 func TestRenderCache(t *testing.T) {

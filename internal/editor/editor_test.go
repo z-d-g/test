@@ -13,7 +13,7 @@ import (
 func testRenderer() render.LineRenderer {
 	theme := config.DefaultTheme()
 	styles := theme.ToEditorStyles()
-	return render.NewLipglossRenderer(&styles)
+	return render.NewLipglossRenderer(&styles, 80)
 }
 
 func TestCursorMovement(t *testing.T) {
