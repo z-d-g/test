@@ -5,6 +5,8 @@ import (
 	"io"
 	"log/slog"
 	"os"
+	"runtime"
+	"runtime/debug"
 
 	"github.com/z-d-g/md-cli/internal/app"
 	"github.com/z-d-g/md-cli/internal/config"
@@ -12,10 +14,19 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-func main() {
+var (
+	version = "dev"
+	commit  = "unknown"
+	date    = "unknown"
+)
 
-	cfg := config.LoadConfig()
+func main() {
 	cliArgs := app.ParseCLIArgs(os.Args[1:])
+
+	if cliArgs.Version {
+		printVersion()
+		return
+	}
 
 	if cliArgs.Help {
 		app.PrintUsage()
@@ -23,6 +34,8 @@ func main() {
 	}
 
 	pipedContent, hasStdin := readStdin()
+
+	cfg := config.LoadConfig()
 
 	if cliArgs.PrintOnly {
 		if hasStdin {
@@ -64,4 +77,19 @@ func readStdin() (string, bool) {
 		return "", false
 	}
 	return string(data), true
+}
+
+func printVersion() {
+	fmt.Printf("md-cli %s (commit: %s, built: %s, go: %s/%s)\n",
+		version, commit, date, runtime.Version(), runtime.GOARCH)
+
+	info, ok := debug.ReadBuildInfo()
+	if ok {
+		fmt.Printf("module: %s\n", info.Path)
+		for _, dep := range info.Deps {
+			if dep.Path == "charm.land/bubbletea/v2" || dep.Path == "charm.land/lipgloss/v2" {
+				fmt.Printf("  %s@%s\n", dep.Path, dep.Version)
+			}
+		}
+	}
 }

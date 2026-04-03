@@ -144,11 +144,13 @@ func (um *UndoManager) GroupUndoEntries(startIndex int) int {
 
 	originalCount := len(um.undoStack) - startIndex
 	var groups []UndoEntry
+	i := startIndex
 
-	for i := startIndex; i < len(um.undoStack); i++ {
+	for i < len(um.undoStack) {
 		entry := um.undoStack[i]
 		if len(entry.inserted) != 1 {
 			groups = append(groups, entry)
+			i++
 			continue
 		}
 
@@ -159,9 +161,10 @@ func (um *UndoManager) GroupUndoEntries(startIndex int) int {
 			cursorAfter:  entry.cursorAfter,
 		}
 		merged.inserted = append(merged.inserted, entry.inserted...)
+		i++
 
-		for i+1 < len(um.undoStack) {
-			next := um.undoStack[i+1]
+		for i < len(um.undoStack) {
+			next := um.undoStack[i]
 			if len(next.inserted) != 1 {
 				break
 			}

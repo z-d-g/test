@@ -137,20 +137,29 @@ func isInCodeBlock(buf *GapBuffer, row int) bool {
 
 func findCodeBlockBounds(buf *GapBuffer, row int) (int, int) {
 	fenceCount := 0
+	fenceChar := byte(0)
 
 	for i := 0; i <= row && i < buf.LineCount(); i++ {
 		if markdown.IsCodeFence(buf.LineAt(i)) {
+			fc := markdown.CodeFenceChar(buf.LineAt(i))
+			if fc != 0 && fenceChar != 0 && fc != fenceChar {
+				continue
+			}
 			fenceCount++
+			if fenceCount == 1 {
+				fenceChar = fc
+			}
 			if i == row {
 				if fenceCount%2 == 1 {
-					return findMatchingCodeFence(buf, row, true)
+					return findMatchingCodeFence(buf, row, fenceChar, true)
 				} else {
-					return findMatchingCodeFence(buf, row, false)
+					return findMatchingCodeFence(buf, row, fenceChar, false)
 				}
 			}
 		}
 	}
 
+	startFenceChar := byte(0)
 	start := row
 	for start >= 0 && !markdown.IsCodeFence(buf.LineAt(start)) {
 		start--
@@ -158,23 +167,27 @@ func findCodeBlockBounds(buf *GapBuffer, row int) (int, int) {
 	if start < 0 || !markdown.IsCodeFence(buf.LineAt(start)) {
 		return row, row
 	}
+	startFenceChar = markdown.CodeFenceChar(buf.LineAt(start))
 
 	end := row
 	for end < buf.LineCount() && !markdown.IsCodeFence(buf.LineAt(end)) {
 		end++
 	}
-	if end >= buf.LineCount() || !markdown.IsCodeFence(buf.LineAt(end)) {
+	if end >= buf.LineCount() || markdown.CodeFenceChar(buf.LineAt(end)) != startFenceChar {
 		return start, buf.LineCount() - 1
 	}
 
 	return start, end
 }
 
-func findMatchingCodeFence(buf *GapBuffer, fenceRow int, isOpening bool) (int, int) {
+func findMatchingCodeFence(buf *GapBuffer, fenceRow int, fenceChar byte, isOpening bool) (int, int) {
 	if isOpening {
 		start := fenceRow
 		end := fenceRow + 1
-		for end < buf.LineCount() && !markdown.IsCodeFence(buf.LineAt(end)) {
+		for end < buf.LineCount() {
+			if markdown.IsCodeFence(buf.LineAt(end)) && markdown.CodeFenceChar(buf.LineAt(end)) == fenceChar {
+				break
+			}
 			end++
 		}
 		if end >= buf.LineCount() {
@@ -184,7 +197,10 @@ func findMatchingCodeFence(buf *GapBuffer, fenceRow int, isOpening bool) (int, i
 	}
 
 	start := fenceRow - 1
-	for start >= 0 && !markdown.IsCodeFence(buf.LineAt(start)) {
+	for start >= 0 {
+		if markdown.IsCodeFence(buf.LineAt(start)) && markdown.CodeFenceChar(buf.LineAt(start)) == fenceChar {
+			break
+		}
 		start--
 	}
 	if start < 0 {

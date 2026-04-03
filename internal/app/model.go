@@ -346,11 +346,14 @@ func truncWithEllipsis(text string, maxWidth int) string {
 		return suffix
 	}
 	var totalW int
+	lastSafeByte := 0
 	for i, r := range text {
-		if totalW+runewidth.RuneWidth(r) > budget {
-			return text[:i] + suffix
+		rw := runewidth.RuneWidth(r)
+		if totalW+rw > budget {
+			return text[:lastSafeByte] + suffix
 		}
-		totalW += runewidth.RuneWidth(r)
+		totalW += rw
+		lastSafeByte = i
 	}
 	return text
 }

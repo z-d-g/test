@@ -381,47 +381,7 @@ func (e *Editor) renderWithSelection(b *strings.Builder, rawLine, styledLine str
 		lineSelEnd = selectionEndCol
 	}
 
-	inEscape := false
-	currentEscape := strings.Builder{}
-	visiblePos := 0
-	styledRunes := []rune(styledLine)
-
-	for i := range styledRunes {
-		r := styledRunes[i]
-
-		if r == '\x1b' {
-			inEscape = true
-			currentEscape.Reset()
-			currentEscape.WriteRune(r)
-			continue
-		}
-
-		if inEscape {
-			currentEscape.WriteRune(r)
-			if r == 'm' {
-				b.WriteString(currentEscape.String())
-				inEscape = false
-			}
-			continue
-		}
-
-		isSelected := visiblePos >= lineSelStart && visiblePos < lineSelEnd
-		isCursorChar := isCursorLine && visiblePos == cursorCol
-
-		if isCursorChar {
-			b.WriteString(e.renderCursorChar(string(r)))
-		} else if isSelected {
-			b.WriteString(e.renderSelectionChar(string(r)))
-		} else {
-			b.WriteRune(r)
-		}
-
-		visiblePos++
-	}
-
-	if inEscape {
-		b.WriteString(currentEscape.String())
-	}
+	writeStyledRunes(b, styledLine, lineSelStart, lineSelEnd, cursorCol, isCursorLine, e.renderCursorChar, e.renderSelectionChar)
 }
 
 // renderWithCursor renders a line with cursor highlighting.
@@ -432,47 +392,60 @@ func (e *Editor) renderWithCursor(b *strings.Builder, rawLine, styledLine string
 		return
 	}
 
-	inEscape := false
-	currentEscape := strings.Builder{}
-	visiblePos := 0
-	cursorRendered := false
-	styledRunes := []rune(styledLine)
+	writeStyledRunes(b, styledLine, -1, -1, cursorCol, true, e.renderCursorChar, e.renderSelectionChar)
+}
 
-	for i := range styledRunes {
-		r := styledRunes[i]
+// ansiCodeWidth skips an ANSI escape sequence starting at i and returns the index after it.
+// Returns i unchanged if no escape sequence is found.
+func ansiCodeWidth(s []rune, i int) int {
+	if i >= len(s) || s[i] != '\x1b' {
+		return i
+	}
+	i++
+	if i >= len(s) || s[i] != '[' {
+		return i
+	}
+	i++
+	for i < len(s) {
+		c := s[i]
+		i++
+		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
+			return i
+		}
+	}
+	return i
+}
 
-		if r == '\x1b' {
-			inEscape = true
-			currentEscape.Reset()
-			currentEscape.WriteRune(r)
+// writeStyledRunes walks styledLine runes, skipping ANSI escape sequences, and writes
+// each display-visible rune through either renderCursor, renderSelection, or plain.
+func writeStyledRunes(b *strings.Builder, styledLine string, selStart, selEnd, cursorCol int, isCursorLine bool, renderCursor, renderSelection func(string) string) {
+	runes := []rune(styledLine)
+	pos := 0
+	for i := 0; i < len(runes); {
+		if runes[i] == '\x1b' {
+			i = ansiCodeWidth(runes, i)
 			continue
 		}
 
-		if inEscape {
-			currentEscape.WriteRune(r)
-			if r == 'm' {
-				b.WriteString(currentEscape.String())
-				inEscape = false
-			}
-			continue
+		isCursorChar := isCursorLine && pos == cursorCol
+		isSelected := selStart >= 0 && selEnd >= 0 && pos >= selStart && pos < selEnd
+
+		ch := string(runes[i])
+		switch {
+		case isCursorChar:
+			b.WriteString(renderCursor(ch))
+		case isSelected:
+			b.WriteString(renderSelection(ch))
+		default:
+			b.WriteString(ch)
 		}
 
-		if visiblePos == cursorCol && !cursorRendered {
-			b.WriteString(e.renderCursorChar(string(r)))
-			cursorRendered = true
-		} else {
-			b.WriteRune(r)
-		}
-
-		visiblePos++
+		pos++
+		i++
 	}
 
-	if inEscape {
-		b.WriteString(currentEscape.String())
-	}
-
-	if !cursorRendered {
-		b.WriteString(e.renderCursorChar(" "))
+	if isCursorLine && pos <= cursorCol {
+		b.WriteString(renderCursor(" "))
 	}
 }
 
